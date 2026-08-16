@@ -1,0 +1,396 @@
+import { InstitutionConfig, SchoolClass, Teacher, Room } from '../types';
+
+export const DEFAULT_INSTITUTION_CONFIG: InstitutionConfig = {
+  name: 'متوسطة العربي بن مهيدي النموذجية',
+  academicYear: '2026/2027',
+  directorName: 'الأستاذ دالي نجيب (مدير المؤسسة)',
+  educationDirectorate: 'مديرية التربية لولاية الجزائر وسط',
+  commune: 'الجزائر العاصمة',
+  days: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'],
+  periods: [
+    { id: 1, name: 'الحصة 1', timeRange: '08:00 - 09:00', isMorning: true },
+    { id: 2, name: 'الحصة 2', timeRange: '09:00 - 10:00', isMorning: true },
+    { id: 3, name: 'الحصة 3', timeRange: '10:00 - 11:00', isMorning: true },
+    { id: 4, name: 'الحصة 4', timeRange: '11:00 - 12:00', isMorning: true },
+    { id: 5, name: 'الحصة 5', timeRange: '13:30 - 14:30', isMorning: false },
+    { id: 6, name: 'الحصة 6', timeRange: '14:30 - 15:30', isMorning: false },
+    { id: 7, name: 'الحصة 7', timeRange: '15:30 - 16:30', isMorning: false },
+    { id: 8, name: 'الحصة 8', timeRange: '16:30 - 17:30', isMorning: false },
+  ],
+  tuesdayAfternoonOff: true,
+  enableAmazigh: false,
+  enableComputerScience: true,
+};
+
+// 20 classes: 5 in 1AM, 6 in 2AM, 5 in 3AM, 4 in 4AM
+export const DEFAULT_CLASSES: SchoolClass[] = [
+  // 1 متوسط (5 أقسام)
+  { id: '1am1', name: '1AM1', level: '1AM', studentCount: 36, assignedRoomId: 'room-01' },
+  { id: '1am2', name: '1AM2', level: '1AM', studentCount: 35, assignedRoomId: 'room-02' },
+  { id: '1am3', name: '1AM3', level: '1AM', studentCount: 38, assignedRoomId: 'room-03' },
+  { id: '1am4', name: '1AM4', level: '1AM', studentCount: 34, assignedRoomId: 'room-04' },
+  { id: '1am5', name: '1AM5', level: '1AM', studentCount: 36, assignedRoomId: 'room-05' },
+
+  // 2 متوسط (6 أقسام)
+  { id: '2am1', name: '2AM1', level: '2AM', studentCount: 38, assignedRoomId: 'room-06' },
+  { id: '2am2', name: '2AM2', level: '2AM', studentCount: 37, assignedRoomId: 'room-07' },
+  { id: '2am3', name: '2AM3', level: '2AM', studentCount: 35, assignedRoomId: 'room-08' },
+  { id: '2am4', name: '2AM4', level: '2AM', studentCount: 36, assignedRoomId: 'room-09' },
+  { id: '2am5', name: '2AM5', level: '2AM', studentCount: 38, assignedRoomId: 'room-10' },
+  { id: '2am6', name: '2AM6', level: '2AM', studentCount: 34, assignedRoomId: 'room-11' },
+
+  // 3 متوسط (5 أقسام)
+  { id: '3am1', name: '3AM1', level: '3AM', studentCount: 35, assignedRoomId: 'room-12' },
+  { id: '3am2', name: '3AM2', level: '3AM', studentCount: 36, assignedRoomId: 'room-13' },
+  { id: '3am3', name: '3AM3', level: '3AM', studentCount: 34, assignedRoomId: 'room-14' },
+  { id: '3am4', name: '3AM4', level: '3AM', studentCount: 37, assignedRoomId: 'room-15' },
+  { id: '3am5', name: '3AM5', level: '3AM', studentCount: 36, assignedRoomId: 'room-16' },
+
+  // 4 متوسط (4 أقسام)
+  { id: '4am1', name: '4AM1', level: '4AM', studentCount: 34, assignedRoomId: 'room-17' },
+  { id: '4am2', name: '4AM2', level: '4AM', studentCount: 35, assignedRoomId: 'room-18' },
+  { id: '4am3', name: '4AM3', level: '4AM', studentCount: 33, assignedRoomId: 'room-19' },
+  { id: '4am4', name: '4AM4', level: '4AM', studentCount: 36, assignedRoomId: 'room-20' },
+];
+
+export const DEFAULT_ROOMS: Room[] = [
+  // Classrooms 1 to 20
+  ...Array.from({ length: 20 }, (_, i) => ({
+    id: `room-${String(i + 1).padStart(2, '0')}`,
+    name: `قاعة التدريس رقم ${i + 1}`,
+    type: 'regular' as const,
+    capacity: 40,
+    isShared: false,
+  })),
+  // Specialized Rooms & Labs
+  { id: 'lab-sci-1', name: 'مخبر علوم الطبيعة والحياة 1', type: 'science_lab', capacity: 20, isShared: true },
+  { id: 'lab-sci-2', name: 'مخبر علوم الطبيعة والحياة 2', type: 'science_lab', capacity: 20, isShared: true },
+  { id: 'lab-phy-1', name: 'مخبر العلوم الفيزيائية والتكنولوجيا 1', type: 'physics_lab', capacity: 20, isShared: true },
+  { id: 'lab-phy-2', name: 'مخبر العلوم الفيزيائية والتكنولوجيا 2', type: 'physics_lab', capacity: 20, isShared: true },
+  { id: 'lab-comp-1', name: 'قاعة الإعلام الآلي (المعلوماتية)', type: 'computer_lab', capacity: 25, isShared: true },
+  { id: 'art-room-1', name: 'ورشة التربية الفنية والموسيقية', type: 'art_room', capacity: 40, isShared: true },
+  { id: 'sport-field-1', name: 'الميدان وفناء التربية البدنية 1', type: 'sports_ground', capacity: 80, isShared: true },
+  { id: 'sport-field-2', name: 'الميدان وفناء التربية البدنية 2', type: 'sports_ground', capacity: 80, isShared: true },
+];
+
+export const DEFAULT_TEACHERS: Teacher[] = [
+  // اللغة العربية (5 سا للأقسام) -> 20 قسم × 5 سا = 100 سا -> ~5-6 أساتذة
+  {
+    id: 't-ar-1',
+    name: 'أ. عبد القادر بوجمعة',
+    subjectId: 'arabic',
+    assignedClassIds: ['1am1', '1am2', '1am3', '1am4'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [{ day: 'الثلاثاء', period: 5 }, { day: 'الثلاثاء', period: 6 }],
+    phone: '0550112233',
+    notes: 'أستاذ منسق لمادة اللغة العربية',
+  },
+  {
+    id: 't-ar-2',
+    name: 'أ. فاطمة الزهراء منصوري',
+    subjectId: 'arabic',
+    assignedClassIds: ['1am5', '2am1', '2am2', '2am3'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [{ day: 'الخميس', period: 7 }, { day: 'الخميس', period: 8 }],
+    phone: '0551223344',
+  },
+  {
+    id: 't-ar-3',
+    name: 'أ. رابح بلقاسم',
+    subjectId: 'arabic',
+    assignedClassIds: ['2am4', '2am5', '2am6', '3am1'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [],
+    phone: '0552334455',
+  },
+  {
+    id: 't-ar-4',
+    name: 'أ. مريم دريسي',
+    subjectId: 'arabic',
+    assignedClassIds: ['3am2', '3am3', '3am4', '3am5'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [{ day: 'الاثنين', period: 1 }],
+    phone: '0553445566',
+  },
+  {
+    id: 't-ar-5',
+    name: 'أ. كمال بن عيسى',
+    subjectId: 'arabic',
+    assignedClassIds: ['4am1', '4am2', '4am3', '4am4'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [],
+    phone: '0554556677',
+    notes: 'أستاذ أقسام الامتحانات الرسمية BEM',
+  },
+
+  // الرياضيات (4 سا للأقسام) -> 20 قسم × 4 سا = 80 سا -> 4-5 أساتذة
+  {
+    id: 't-math-1',
+    name: 'أ. محمد لمين علالي',
+    subjectId: 'math',
+    assignedClassIds: ['1am1', '1am2', '1am3', '1am4'],
+    maxWeeklyHours: 18,
+    minWeeklyHours: 16,
+    unavailableSlots: [{ day: 'الأحد', period: 1 }],
+    phone: '0555667788',
+    notes: 'أستاذ رئيسي للرياضيات',
+  },
+  {
+    id: 't-math-2',
+    name: 'أ. سميرة شريف',
+    subjectId: 'math',
+    assignedClassIds: ['1am5', '2am1', '2am2', '2am3'],
+    maxWeeklyHours: 18,
+    minWeeklyHours: 16,
+    unavailableSlots: [],
+    phone: '0556778899',
+  },
+  {
+    id: 't-math-3',
+    name: 'أ. توفيق زروقي',
+    subjectId: 'math',
+    assignedClassIds: ['2am4', '2am5', '2am6', '3am1'],
+    maxWeeklyHours: 18,
+    minWeeklyHours: 16,
+    unavailableSlots: [{ day: 'الأربعاء', period: 7 }, { day: 'الأربعاء', period: 8 }],
+    phone: '0557889900',
+  },
+  {
+    id: 't-math-4',
+    name: 'أ. حياة براهيمي',
+    subjectId: 'math',
+    assignedClassIds: ['3am2', '3am3', '3am4', '3am5'],
+    maxWeeklyHours: 18,
+    minWeeklyHours: 16,
+    unavailableSlots: [],
+    phone: '0558990011',
+  },
+  {
+    id: 't-math-5',
+    name: 'أ. حسين حداد',
+    subjectId: 'math',
+    assignedClassIds: ['4am1', '4am2', '4am3', '4am4'],
+    maxWeeklyHours: 18,
+    minWeeklyHours: 16,
+    unavailableSlots: [],
+    phone: '0559001122',
+    notes: 'مكلف بالسنة الرابعة متوسط شهادة التعليم المتوسط',
+  },
+
+  // اللغة الفرنسية (2 سا للأقسام) -> 20 × 2 = 40 سا -> 2 أساتذة
+  {
+    id: 't-fr-1',
+    name: 'أ. نادية مزيان',
+    subjectId: 'french',
+    assignedClassIds: ['1am1', '1am2', '1am3', '1am4', '1am5', '2am1', '2am2', '2am3', '2am4', '2am5'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [{ day: 'الاثنين', period: 5 }],
+    phone: '0560112233',
+  },
+  {
+    id: 't-fr-2',
+    name: 'أ. جمال بوزيان',
+    subjectId: 'french',
+    assignedClassIds: ['2am6', '3am1', '3am2', '3am3', '3am4', '3am5', '4am1', '4am2', '4am3', '4am4'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [],
+    phone: '0561223344',
+  },
+
+  // اللغة الإنجليزية (3 سا للأقسام) -> 20 × 3 = 60 سا -> 3 أساتذة
+  {
+    id: 't-en-1',
+    name: 'أ. سارة قرقور',
+    subjectId: 'english',
+    assignedClassIds: ['1am1', '1am2', '1am3', '1am4', '1am5', '2am1', '2am2'],
+    maxWeeklyHours: 21,
+    minWeeklyHours: 18,
+    unavailableSlots: [],
+    phone: '0562334455',
+  },
+  {
+    id: 't-en-2',
+    name: 'أ. وليد عمروش',
+    subjectId: 'english',
+    assignedClassIds: ['2am3', '2am4', '2am5', '2am6', '3am1', '3am2', '3am3'],
+    maxWeeklyHours: 21,
+    minWeeklyHours: 18,
+    unavailableSlots: [{ day: 'الأحد', period: 5 }],
+    phone: '0563445566',
+  },
+  {
+    id: 't-en-3',
+    name: 'أ. سهام قاسي',
+    subjectId: 'english',
+    assignedClassIds: ['3am4', '3am5', '4am1', '4am2', '4am3', '4am4'],
+    maxWeeklyHours: 18,
+    minWeeklyHours: 18,
+    unavailableSlots: [],
+    phone: '0564556677',
+  },
+
+  // العلوم الطبيعية والحياة (2 سا) -> 20 × 2 = 40 سا -> 2 أساتذة
+  {
+    id: 't-sci-1',
+    name: 'أ. نور الدين مداني',
+    subjectId: 'science',
+    assignedClassIds: ['1am1', '1am2', '1am3', '1am4', '1am5', '2am1', '2am2', '2am3', '2am4', '2am5'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [],
+    phone: '0565667788',
+  },
+  {
+    id: 't-sci-2',
+    name: 'أ. ليلى عماري',
+    subjectId: 'science',
+    assignedClassIds: ['2am6', '3am1', '3am2', '3am3', '3am4', '3am5', '4am1', '4am2', '4am3', '4am4'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [{ day: 'الأربعاء', period: 1 }],
+    phone: '0566778899',
+  },
+
+  // العلوم الفيزيائية والتكنولوجيا (2 سا) -> 20 × 2 = 40 سا -> 2 أساتذة
+  {
+    id: 't-phy-1',
+    name: 'أ. بلقاسم قندوز',
+    subjectId: 'physics',
+    assignedClassIds: ['1am1', '1am2', '1am3', '1am4', '1am5', '2am1', '2am2', '2am3', '2am4', '2am5'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [],
+    phone: '0567889900',
+  },
+  {
+    id: 't-phy-2',
+    name: 'أ. أسماء رحماني',
+    subjectId: 'physics',
+    assignedClassIds: ['2am6', '3am1', '3am2', '3am3', '3am4', '3am5', '4am1', '4am2', '4am3', '4am4'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [{ day: 'الخميس', period: 1 }],
+    phone: '0568990011',
+  },
+
+  // التاريخ والجغرافيا (1+1 = 2 سا) -> 20 × 2 = 40 سا -> 2 أساتذة
+  {
+    id: 't-hg-1',
+    name: 'أ. طاهر بوعكاز',
+    subjectId: 'history',
+    assignedClassIds: ['1am1', '1am2', '1am3', '1am4', '1am5', '2am1', '2am2', '2am3', '2am4', '2am5'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [],
+    phone: '0569001122',
+  },
+  {
+    id: 't-hg-2',
+    name: 'أ. حسيبة بلعيد',
+    subjectId: 'history',
+    assignedClassIds: ['2am6', '3am1', '3am2', '3am3', '3am4', '3am5', '4am1', '4am2', '4am3', '4am4'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [],
+    phone: '0570112233',
+  },
+  // أستاذ الجغرافيا المنسق
+  {
+    id: 't-geo-1',
+    name: 'أ. رشيد بن ناصر',
+    subjectId: 'geography',
+    assignedClassIds: ['1am1', '1am2', '1am3', '1am4', '1am5', '2am1', '2am2', '2am3', '2am4', '2am5'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [],
+    phone: '0571223344',
+  },
+  {
+    id: 't-geo-2',
+    name: 'أ. حنان صوالحي',
+    subjectId: 'geography',
+    assignedClassIds: ['2am6', '3am1', '3am2', '3am3', '3am4', '3am5', '4am1', '4am2', '4am3', '4am4'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [],
+    phone: '0572334455',
+  },
+
+  // التربية الإسلامية (1 سا) -> 20 × 1 = 20 سا -> 1 أستاذ
+  {
+    id: 't-isl-1',
+    name: 'أ. الشيخ يحيى بومدين',
+    subjectId: 'islamic',
+    assignedClassIds: ['1am1', '1am2', '1am3', '1am4', '1am5', '2am1', '2am2', '2am3', '2am4', '2am5', '3am1', '3am2', '3am3', '3am4', '3am5', '4am1', '4am2', '4am3', '4am4'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [{ day: 'الخميس', period: 5 }],
+    phone: '0573445566',
+  },
+
+  // التربية المدنية (1 سا) -> 20 × 1 = 20 سا -> 1 أستاذ
+  {
+    id: 't-civ-1',
+    name: 'أ. أحلام قسوم',
+    subjectId: 'civic',
+    assignedClassIds: ['1am1', '1am2', '1am3', '1am4', '1am5', '2am1', '2am2', '2am3', '2am4', '2am5', '3am1', '3am2', '3am3', '3am4', '3am5', '4am1', '4am2', '4am3', '4am4'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [],
+    phone: '0574556677',
+  },
+
+  // التربية البدنية والرياضية (2 سا) -> 20 × 2 = 40 سا -> 2 أساتذة
+  {
+    id: 't-pe-1',
+    name: 'كابتن حميد طالبي',
+    subjectId: 'pe',
+    assignedClassIds: ['1am1', '1am2', '1am3', '1am4', '1am5', '2am1', '2am2', '2am3', '2am4', '2am5'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [],
+    phone: '0575667788',
+  },
+  {
+    id: 't-pe-2',
+    name: 'كابتن مراد لعريبي',
+    subjectId: 'pe',
+    assignedClassIds: ['2am6', '3am1', '3am2', '3am3', '3am4', '3am5', '4am1', '4am2', '4am3', '4am4'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [],
+    phone: '0576778899',
+  },
+
+  // التربية التشكيلية والموسيقية (1 سا) -> 20 × 1 = 20 سا -> 1 أستاذ
+  {
+    id: 't-art-1',
+    name: 'أ. فتيحة بن سالم',
+    subjectId: 'art_music',
+    assignedClassIds: ['1am1', '1am2', '1am3', '1am4', '1am5', '2am1', '2am2', '2am3', '2am4', '2am5', '3am1', '3am2', '3am3', '3am4', '3am5', '4am1', '4am2', '4am3', '4am4'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [{ day: 'الاثنين', period: 7 }],
+    phone: '0577889900',
+  },
+
+  // المعلوماتية (1 سا) -> 20 × 1 = 20 سا -> 1 أستاذ
+  {
+    id: 't-comp-1',
+    name: 'أ. المهندس وليد بن عمار',
+    subjectId: 'computer',
+    assignedClassIds: ['1am1', '1am2', '1am3', '1am4', '1am5', '2am1', '2am2', '2am3', '2am4', '2am5', '3am1', '3am2', '3am3', '3am4', '3am5', '4am1', '4am2', '4am3', '4am4'],
+    maxWeeklyHours: 20,
+    minWeeklyHours: 18,
+    unavailableSlots: [],
+    phone: '0578990011',
+    notes: 'مسؤول مخبر وشبكة الإعلام الآلي',
+  },
+];

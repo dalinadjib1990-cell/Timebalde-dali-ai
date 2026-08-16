@@ -1,0 +1,6 @@
+{
+  "name": "DALI TIMETABLE AI",
+  "description": "نظام ذكي وشامل لإنشاء وإدارة استعمال الزمن للمتوسطة الجزائرية استناداً إلى الوثيقة الوزارية الرسمية للمواقيت والمعاملات 2026/2027",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

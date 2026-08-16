@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/api/health",
+      "destination": "/api/health"
+    },
+    {
+      "source": "/api/gemini/ai-scheduler",
+      "destination": "/api/gemini/ai-scheduler"
+    },
+    {
+      "source": "/api/gemini/parse-document",
+      "destination": "/api/gemini/parse-document"
+    },
+    {
+      "source": "/api/gemini/import-teachers",
+      "destination": "/api/gemini/import-teachers"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
