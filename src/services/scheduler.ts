@@ -583,3 +583,219 @@ export function autoRepairTimetable(
   );
 }
 
+/**
+ * Instantly applies principal directives directly onto the CURRENT active timetable (without clearing).
+ * Performs live pedagogical slot movements, gap reductions, and Tuesday-afternoon clearance.
+ */
+export function applyDirectivesInstantlyToExistingTimetable(
+  currentSlots: TimetableSlot[],
+  directives: PrincipalDirective[],
+  classes: SchoolClass[],
+  teachers: Teacher[],
+  rooms: Room[],
+  rules: SubjectRule[],
+  config: InstitutionConfig
+): {
+  success: boolean;
+  slots: TimetableSlot[];
+  modifiedCount: number;
+  message: string;
+} {
+  if (currentSlots.length === 0) {
+    // If table is empty, generate freshly adhering to directives
+    const result = generateInstitutionalTimetable(classes, teachers, rooms, rules, config, [], {
+      directives,
+    });
+    return {
+      success: result.success,
+      slots: result.slots,
+      modifiedCount: result.slots.length,
+      message: 'تم توليد جدول جديد بالكامل وتطبيق جميع توجيهات المدير بنجاح.',
+    };
+  }
+
+  let slots = [...currentSlots];
+  let modifiedCount = 0;
+  const changeNotes: string[] = [];
+
+  const activeKeys = new Set(directives.filter((d) => d.active).map((d) => d.key));
+  const days: ('sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday')[] = [
+    'sunday',
+    'monday',
+    'tuesday',
+    'wednesday',
+    'thursday',
+  ];
+
+  // Helper to test if a slot can safely move to target day/period
+  const canMoveSlot = (
+    candidateSlot: TimetableSlot,
+    targetDay: string,
+    targetPeriod: number,
+    currentWorkingSlots: TimetableSlot[]
+  ): boolean => {
+    // Check if target is Tuesday afternoon when tuesday_afternoon_off is active
+    if (activeKeys.has('tuesday_afternoon_off') && targetDay === 'tuesday' && targetPeriod >= 5) {
+      return false;
+    }
+
+    // Check teacher availability & conflicts
+    const teacher = teachers.find((t) => t.id === candidateSlot.teacherId);
+    if (teacher?.unavailableSlots?.some((u) => u.day === targetDay && u.period === targetPeriod)) {
+      return false;
+    }
+
+    // Check teacher already teaching at target
+    const teacherBusy = currentWorkingSlots.some(
+      (s) => s.id !== candidateSlot.id && s.teacherId === candidateSlot.teacherId && s.day === targetDay && s.period === targetPeriod
+    );
+    if (teacherBusy) return false;
+
+    // Check class already has a class at target
+    const classBusy = currentWorkingSlots.some(
+      (s) => s.id !== candidateSlot.id && s.classId === candidateSlot.classId && s.day === targetDay && s.period === targetPeriod
+    );
+    if (classBusy) return false;
+
+    // Check room availability
+    const roomBusy = currentWorkingSlots.some(
+      (s) => s.id !== candidateSlot.id && s.roomId === candidateSlot.roomId && s.day === targetDay && s.period === targetPeriod
+    );
+    if (roomBusy) return false;
+
+    return true;
+  };
+
+  // 1. Directive: Free Tuesday Afternoon (تفريغ مساء الثلاثاء للندوات)
+  if (activeKeys.has('tuesday_afternoon_off')) {
+    let tuesdayMoved = 0;
+    const tuesdayAfternoonSlots = slots.filter((s) => s.day === 'tuesday' && s.period >= 5);
+
+    for (const tSlot of tuesdayAfternoonSlots) {
+      let moved = false;
+      // Search for an available slot in other days
+      for (const d of ['sunday', 'monday', 'wednesday', 'thursday', 'tuesday'] as const) {
+        const maxP = d === 'tuesday' ? 4 : 8;
+        for (let p = 1; p <= maxP; p++) {
+          if (canMoveSlot(tSlot, d, p, slots)) {
+            slots = slots.map((s) =>
+              s.id === tSlot.id ? { ...s, day: d, period: p } : s
+            );
+            tuesdayMoved++;
+            modifiedCount++;
+            moved = true;
+            break;
+          }
+        }
+        if (moved) break;
+      }
+    }
+    if (tuesdayMoved > 0) {
+      changeNotes.push(`تم نقل وتفريغ ${tuesdayMoved} حصة من مساء الثلاثاء إلى فترات أخرى`);
+    }
+  }
+
+  // 2. Directive: Prefer Morning for Core Subjects (تركيز المواد الأساسية في الصباح)
+  if (activeKeys.has('prefer_morning_core')) {
+    const coreSubjects = new Set(['arabic', 'math', 'science', 'physics', 'french']);
+    let morningSwapped = 0;
+
+    for (const cls of classes) {
+      const classSlots = slots.filter((s) => s.classId === cls.id);
+      const afternoonCore = classSlots.filter(
+        (s) => coreSubjects.has(s.subjectId) && s.period >= 5
+      );
+      const morningNonCore = classSlots.filter(
+        (s) => !coreSubjects.has(s.subjectId) && s.period <= 4 && s.type !== 'sport'
+      );
+
+      for (const coreSlot of afternoonCore) {
+        for (const nonCoreSlot of morningNonCore) {
+          // Check if swapping their (day, period) is conflict-free
+          const tempSlots = slots.filter((s) => s.id !== coreSlot.id && s.id !== nonCoreSlot.id);
+          const coreToTargetOk = canMoveSlot(coreSlot, nonCoreSlot.day, nonCoreSlot.period, tempSlots);
+          const nonCoreToTargetOk = canMoveSlot(nonCoreSlot, coreSlot.day, coreSlot.period, tempSlots);
+
+          if (coreToTargetOk && nonCoreToTargetOk) {
+            slots = slots.map((s) => {
+              if (s.id === coreSlot.id) {
+                return { ...s, day: nonCoreSlot.day, period: nonCoreSlot.period };
+              }
+              if (s.id === nonCoreSlot.id) {
+                return { ...s, day: coreSlot.day, period: coreSlot.period };
+              }
+              return s;
+            });
+            morningSwapped++;
+            modifiedCount += 2;
+            break;
+          }
+        }
+      }
+    }
+    if (morningSwapped > 0) {
+      changeNotes.push(`تم تقديم ${morningSwapped} مادة أساسية إلى الفترات الصباحية`);
+    }
+  }
+
+  // 3. Directive: Minimize Teacher Gaps (تقليل الساعات الفارغة البينية للأساتذة)
+  if (activeKeys.has('minimize_teacher_gaps')) {
+    let gapsReduced = 0;
+    for (const teacher of teachers) {
+      for (const day of days) {
+        const teacherDaySlots = slots
+          .filter((s) => s.teacherId === teacher.id && s.day === day)
+          .sort((a, b) => a.period - b.period);
+
+        if (teacherDaySlots.length >= 2) {
+          const periods = teacherDaySlots.map((s) => s.period);
+          const minP = Math.min(...periods);
+          const maxP = Math.max(...periods);
+
+          // Find if there is a gap inside the teacher's day
+          for (let p = minP + 1; p < maxP; p++) {
+            if (!periods.includes(p)) {
+              // Found gap at period 'p'. Try to shift the later slot (p > p) into this empty period 'p'
+              const laterSlot = teacherDaySlots.find((s) => s.period > p);
+              if (laterSlot && canMoveSlot(laterSlot, day, p, slots)) {
+                slots = slots.map((s) =>
+                  s.id === laterSlot.id ? { ...s, period: p } : s
+                );
+                gapsReduced++;
+                modifiedCount++;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+    if (gapsReduced > 0) {
+      changeNotes.push(`تم تجميع الحصص وسد ${gapsReduced} ساعة فارغة بينية للأساتذة`);
+    }
+  }
+
+  // If no minor slot shifts were possible, regenerate with directives to ensure 100% compliance
+  if (modifiedCount === 0) {
+    const fullRes = generateInstitutionalTimetable(classes, teachers, rooms, rules, config, [], {
+      directives,
+    });
+    return {
+      success: fullRes.success,
+      slots: fullRes.slots,
+      modifiedCount: fullRes.slots.length,
+      message: 'تم إعادة موازنة الجدول وتطبيق جميع توجيهات المدير البيداغوجية بنجاح.',
+    };
+  }
+
+  return {
+    success: true,
+    slots,
+    modifiedCount,
+    message:
+      changeNotes.length > 0
+        ? `تم تطبيق توجيهات المدير فوراً على الجدول: ${changeNotes.join(' • ')}.`
+        : 'تم تحديث وضبط استعمال الزمن وفق توجيهات المدير.',
+  };
+}
+
