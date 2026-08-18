@@ -39,6 +39,7 @@ import {
   generateInstitutionalTimetable,
   applyDirectivesInstantlyToExistingTimetable,
 } from '../services/scheduler';
+import { soundManager } from '../services/soundService';
 
 interface Props {
   slots: TimetableSlot[];
@@ -208,6 +209,7 @@ export const AiSchedulerView: React.FC<Props> = ({
     setDirectives(updated);
 
     const toggled = updated.find((d) => d.id === id);
+    soundManager.playToggle(!!toggled?.active);
     const statusText = toggled?.active ? 'تفعيل' : 'إلغاء تفعيل';
     const applied = applyDirectivesInstantlyToExistingTimetable(
       slots,
@@ -226,6 +228,7 @@ export const AiSchedulerView: React.FC<Props> = ({
   // Add custom directive from principal and apply
   const handleAddCustomDirective = () => {
     if (!newDirectiveText.trim()) return;
+    soundManager.playClick();
     const newDir: PrincipalDirective = {
       id: `dir-custom-${Date.now()}`,
       key: `custom_${Date.now()}`,
@@ -265,6 +268,7 @@ export const AiSchedulerView: React.FC<Props> = ({
     const nextVarIndex = forceNextVariant ? variationIndex + 1 : variationIndex;
     setVariationIndex(nextVarIndex);
 
+    soundManager.playGenerateStart();
     setIsGenerating(true);
     setGenerationStep('قراءة توجيهات المدير والوثيقة الوزارية 27 جويلية 2026...');
     await new Promise((r) => setTimeout(r, 200));
@@ -303,6 +307,7 @@ export const AiSchedulerView: React.FC<Props> = ({
     setIsGenerating(false);
     setGenerationStep('');
     onApplyNewTimetable(result.slots, result.message);
+    soundManager.playGenerateSuccess();
 
     // Add confirmation message to chat
     setMessages((prev) => [
@@ -647,7 +652,10 @@ export const AiSchedulerView: React.FC<Props> = ({
             {/* Save Timetable Button */}
             <button
               id="save-timetable-version-btn"
-              onClick={() => setShowSaveModal(true)}
+              onClick={() => {
+                soundManager.playClick();
+                setShowSaveModal(true);
+              }}
               className="flex items-center gap-2 px-4 py-3 bg-[#162516] hover:bg-[#203620] text-[#4ade80] border border-[#4ade80]/40 font-bold text-xs rounded-xl shadow-lg transition-all cursor-pointer"
               title="حفظ التوليد الحالي كنسخة معتمدة في الأرشيف"
             >
@@ -658,7 +666,10 @@ export const AiSchedulerView: React.FC<Props> = ({
             {/* Clear & Reset Button */}
             <button
               id="reset-timetables-btn"
-              onClick={() => setShowClearConfirmModal(true)}
+              onClick={() => {
+                soundManager.playClick(400);
+                setShowClearConfirmModal(true);
+              }}
               className="flex items-center gap-2 px-4 py-3 bg-[#261212] hover:bg-[#381a1a] text-[#f87171] border border-[#f87171]/40 font-bold text-xs rounded-xl shadow-lg transition-all cursor-pointer"
               title="تفريغ جميع الجداول لملئها يدوياً من الصفر"
             >
@@ -739,7 +750,10 @@ export const AiSchedulerView: React.FC<Props> = ({
 
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => handleApplyDirectivesInstantly()}
+              onClick={() => {
+                soundManager.playClick();
+                handleApplyDirectivesInstantly();
+              }}
               className="p-2 px-3 bg-[#141414] hover:bg-[#1a120a] border border-[#d4af37]/50 text-[#d4af37] font-bold text-xs rounded-xl flex items-center gap-1.5 cursor-pointer shadow-md transition-all"
               title="تطبيق التوجيهات النشطة حالياً على الجدول المعروض بدون إعادة توليده من الصفر"
             >
@@ -1026,7 +1040,10 @@ export const AiSchedulerView: React.FC<Props> = ({
             {quickPrompts.map((q, idx) => (
               <button
                 key={idx}
-                onClick={() => handleSendMessage(q)}
+                onClick={() => {
+                  soundManager.playClick();
+                  handleSendMessage(q);
+                }}
                 className="px-3 py-1 bg-[#141414] hover:bg-[#1a120a] text-[#aaa] hover:text-[#d4af37] hover:border-[#d4af37]/40 border border-[#222] rounded-full text-[11px] font-medium whitespace-nowrap transition-colors cursor-pointer"
               >
                 {q}
@@ -1045,7 +1062,10 @@ export const AiSchedulerView: React.FC<Props> = ({
               className="flex-1 p-2.5 bg-[#121212] border border-[#333] rounded-xl text-xs text-[#e0e0e0] placeholder-[#555] focus:border-[#d4af37] outline-hidden"
             />
             <button
-              onClick={() => handleSendMessage()}
+              onClick={() => {
+                soundManager.playClick();
+                handleSendMessage();
+              }}
               disabled={isAiReplying || !chatInput.trim()}
               className="p-2.5 bg-[#d4af37] hover:bg-[#c59e2e] disabled:opacity-50 text-black font-bold rounded-xl shadow-md transition-colors cursor-pointer"
             >

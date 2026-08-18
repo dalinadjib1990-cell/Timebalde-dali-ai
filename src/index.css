@@ -1,1 +1,113 @@
 @import "tailwindcss";
+
+@keyframes marquee {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes shimmerWave {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-dhikr-marquee {
+  display: inline-block;
+  white-space: nowrap;
+  animation: marquee 45s linear infinite;
+}
+
+.animate-dhikr-marquee:hover {
+  animation-play-state: paused;
+}
+
+.shimmer-bar-bg {
+  background: linear-gradient(
+    90deg,
+    #0d1117 0%,
+    #1b2838 20%,
+    #0f3460 35%,
+    #16213e 50%,
+    #1f4068 65%,
+    #1b2838 80%,
+    #0d1117 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmerWave 8s ease-in-out infinite;
+}
+
+.shimmer-gold-line {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(212, 175, 55, 0.2) 20%,
+    rgba(212, 175, 55, 0.8) 50%,
+    rgba(212, 175, 55, 0.2) 80%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmerWave 4s linear infinite;
+}
+
+/* Light Theme Variables & Overrides */
+.light {
+  color-scheme: light;
+}
+
+.light body,
+.light .app-bg-root {
+  background-color: #f4f6f9;
+  color: #1e293b;
+}
+
+.light .bg-\[\#0a0a0a\],
+.light .bg-\[\#0d0d0d\],
+.light .bg-\[\#000000\],
+.light .bg-\[\#050505\] {
+  background-color: #ffffff !important;
+}
+
+.light .bg-\[\#121212\],
+.light .bg-\[\#141414\],
+.light .bg-\[\#161616\],
+.light .bg-\[\#181818\],
+.light .bg-\[\#1a1a1a\] {
+  background-color: #f8fafc !important;
+}
+
+.light .border-\[\#222\],
+.light .border-\[\#1a1a1a\],
+.light .border-\[\#333\] {
+  border-color: #e2e8f0 !important;
+}
+
+.light .text-white {
+  color: #0f172a !important;
+}
+
+.light .text-\[\#e0e0e0\],
+.light .text-\[\#ccc\],
+.light .text-\[\#bbb\] {
+  color: #334155 !important;
+}
+
+.light .text-\[\#888\],
+.light .text-\[\#777\],
+.light .text-\[\#999\],
+.light .text-\[\#666\],
+.light .text-\[\#555\] {
+  color: #64748b !important;
+}
+
+.light .hover\:bg-\[\#161616\]:hover,
+.light .hover\:bg-\[\#222\]:hover,
+.light .hover\:bg-\[\#1f1f1f\]:hover {
+  background-color: #edf2f7 !important;
+}

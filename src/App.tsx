@@ -14,6 +14,8 @@ import { LegalRulesView } from './components/LegalRulesView';
 import { ConflictsView } from './components/ConflictsView';
 import { LegalValidationView } from './components/LegalValidationView';
 import { DocumentUpdaterModal } from './components/DocumentUpdaterModal';
+import { IslamicTopBar } from './components/IslamicTopBar';
+import { soundManager } from './services/soundService';
 
 import {
   SubjectRule,
@@ -97,8 +99,39 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('dali_theme_dark');
+    return saved !== null ? saved === 'true' : true;
+  });
+
+  const [isSoundMuted, setIsSoundMuted] = useState<boolean>(() => {
+    return soundManager.getIsMuted();
+  });
+
   const [showDocumentUpdater, setShowDocumentUpdater] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Sync theme changes with DOM and localStorage
+  useEffect(() => {
+    localStorage.setItem('dali_theme_dark', String(isDarkMode));
+    if (isDarkMode) {
+      document.documentElement.classList.remove('light');
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+    }
+  }, [isDarkMode]);
+
+  const handleToggleTheme = () => {
+    setIsDarkMode((prev) => !prev);
+  };
+
+  const handleToggleSound = () => {
+    const nextMuted = soundManager.toggleMute();
+    setIsSoundMuted(nextMuted);
+    showToast(nextMuted ? 'تم كتم المؤثرات الصوتية 🔇' : 'تم تفعيل المؤثرات الصوتية 🔊');
+  };
 
   // Auto-save savedVersions to localStorage
   useEffect(() => {
@@ -348,7 +381,15 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#050505] text-[#e0e0e0] flex flex-col font-sans selection:bg-[#d4af37] selection:text-black">
+    <div className={`min-h-screen ${isDarkMode ? 'bg-[#050505] text-[#e0e0e0]' : 'bg-[#f4f6f9] text-[#1e293b]'} flex flex-col font-sans selection:bg-[#d4af37] selection:text-black app-bg-root transition-colors duration-200`}>
+      {/* Dynamic Animated Islamic Top Bar with Moving Dhikr & Controls */}
+      <IslamicTopBar
+        isDarkMode={isDarkMode}
+        onToggleTheme={handleToggleTheme}
+        isMuted={isSoundMuted}
+        onToggleSound={handleToggleSound}
+      />
+
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 left-6 z-50 bg-[#0f0f0f] text-white px-5 py-3 rounded-xl shadow-2xl border border-[#d4af37]/40 text-xs font-bold flex items-center gap-3 animate-in slide-in-from-bottom-5">

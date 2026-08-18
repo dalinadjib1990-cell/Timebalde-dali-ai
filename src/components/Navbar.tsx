@@ -12,6 +12,7 @@ import {
   UploadCloud,
   Layers,
 } from 'lucide-react';
+import { soundManager } from '../services/soundService';
 
 export type ActiveTab =
   | 'official_rules'
@@ -114,8 +115,11 @@ export const Navbar: React.FC<Props> = ({
         <div className="flex items-center gap-2">
           <button
             id="open-doc-updater-nav-btn"
-            onClick={onOpenDocumentUpdater}
-            className="flex items-center gap-2 px-3.5 py-1.5 bg-[#161616] hover:bg-[#222] border border-[#d4af37]/40 text-[#d4af37] text-xs font-semibold rounded-xl transition-all shadow-xs"
+            onClick={() => {
+              soundManager.playClick();
+              onOpenDocumentUpdater();
+            }}
+            className="flex items-center gap-2 px-3.5 py-1.5 bg-[#161616] hover:bg-[#222] border border-[#d4af37]/40 text-[#d4af37] text-xs font-semibold rounded-xl transition-all shadow-xs cursor-pointer"
             title="مقارنة وتحديث أي وثيقة أو منشور وزاري جديد بواسطة الذكاء الاصطناعي"
           >
             <UploadCloud className="w-3.5 h-3.5" />
@@ -135,8 +139,11 @@ export const Navbar: React.FC<Props> = ({
               <button
                 key={tab.id}
                 id={`nav-tab-${tab.id}`}
-                onClick={() => onSelectTab(tab.id)}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium transition-all ${
+                onClick={() => {
+                  soundManager.playTabSwitch();
+                  onSelectTab(tab.id);
+                }}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer ${
                   isActive
                     ? 'bg-[#161616] text-[#d4af37] border border-[#d4af37]/40 shadow-[0_0_12px_rgba(212,175,55,0.12)] font-bold'
                     : 'text-[#999] hover:bg-[#0f0f0f] hover:text-white border border-transparent'
