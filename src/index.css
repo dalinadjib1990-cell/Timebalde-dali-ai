@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
-@keyframes marquee {
+@keyframes dhikrTicker {
   0% {
-    transform: translateX(100%);
+    transform: translateX(0);
   }
   100% {
-    transform: translateX(-100%);
+    transform: translateX(-50%);
   }
 }
 
@@ -18,42 +18,44 @@
   }
 }
 
-.animate-dhikr-marquee {
-  display: inline-block;
-  white-space: nowrap;
-  animation: marquee 45s linear infinite;
+.animate-dhikr-ticker {
+  display: inline-flex !important;
+  flex-wrap: nowrap !important;
+  white-space: nowrap !important;
+  will-change: transform;
+  animation: dhikrTicker 65s linear infinite;
 }
 
-.animate-dhikr-marquee:hover {
+.animate-dhikr-ticker:hover {
   animation-play-state: paused;
 }
 
 .shimmer-bar-bg {
   background: linear-gradient(
     90deg,
-    #0d1117 0%,
-    #1b2838 20%,
-    #0f3460 35%,
-    #16213e 50%,
-    #1f4068 65%,
-    #1b2838 80%,
-    #0d1117 100%
+    #09111e 0%,
+    #0f172a 20%,
+    #1e293b 35%,
+    #0f2b48 50%,
+    #1e293b 65%,
+    #0f172a 80%,
+    #09111e 100%
   );
   background-size: 200% 100%;
-  animation: shimmerWave 8s ease-in-out infinite;
+  animation: shimmerWave 10s ease-in-out infinite;
 }
 
 .shimmer-gold-line {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(212, 175, 55, 0.2) 20%,
-    rgba(212, 175, 55, 0.8) 50%,
-    rgba(212, 175, 55, 0.2) 80%,
+    rgba(212, 175, 55, 0.15) 20%,
+    rgba(212, 175, 55, 0.7) 50%,
+    rgba(212, 175, 55, 0.15) 80%,
     transparent 100%
   );
   background-size: 200% 100%;
-  animation: shimmerWave 4s linear infinite;
+  animation: shimmerWave 5s linear infinite;
 }
 
 /* Light Theme Variables & Overrides */

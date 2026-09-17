@@ -255,8 +255,8 @@ export function generateInstitutionalTimetable(
     if (a.preferredRoomType !== 'regular' && b.preferredRoomType === 'regular') return -1;
     if (a.preferredRoomType === 'regular' && b.preferredRoomType !== 'regular') return 1;
     
-    // Core subjects first (Math, Arabic, etc.)
-    const prioritySubjects: SubjectId[] = ['math', 'arabic', 'physics', 'science', 'french', 'english'];
+    // Core subjects first (French restored as primary core alongside Math & Arabic; English is secondary)
+    const prioritySubjects: SubjectId[] = ['math', 'arabic', 'french', 'physics', 'science', 'history', 'geography', 'islamic', 'english', 'civic', 'computer'];
     const aIdx = prioritySubjects.indexOf(a.subjectId);
     const bIdx = prioritySubjects.indexOf(b.subjectId);
     if (aIdx !== -1 && bIdx !== -1) {
@@ -349,9 +349,9 @@ export function generateInstitutionalTimetable(
         // Score heuristic:
         let score = 100;
 
-        // DIRECTIVE: Morning priority for hard cognitive subjects
+        // DIRECTIVE: Morning priority for hard cognitive subjects (French restored as primary cognitive core)
         const isMorning = p <= 4;
-        const isCore = ['math', 'arabic', 'physics', 'science'].includes(req.subjectId);
+        const isCore = ['math', 'arabic', 'french', 'physics', 'science'].includes(req.subjectId);
         if (isCore) {
           if (preferMorningCore) {
             score += isMorning ? 50 : -35;
@@ -359,6 +359,9 @@ export function generateInstitutionalTimetable(
           } else {
             score += isMorning ? 30 : -10;
           }
+        } else if (req.subjectId === 'english') {
+          // Secondary foreign language: balanced distribution in late morning or afternoon
+          score += (p === 3 || p === 5 || p === 6) ? 25 : 10;
         } else if (req.subjectId === 'pe') {
           // PE is good mid-morning or afternoon
           score += (p === 3 || p === 5) ? 35 : 0;
@@ -406,8 +409,8 @@ export function generateInstitutionalTimetable(
           const cdKey = `${req.classId}_${day}`;
           const classSched = classScheduleMap.get(cdKey) || [];
           const prevLesson = classSched.find((s) => s.period === p - 1);
-          if (prevLesson && isCore && ['math', 'physics', 'science'].includes(prevLesson.subjectId)) {
-            score -= 40; // Avoid e.g. Math immediately followed by Physics
+          if (prevLesson && isCore && ['math', 'french', 'physics', 'science'].includes(prevLesson.subjectId)) {
+            score -= 40; // Avoid e.g. Math immediately followed by French or Physics
           }
         }
 

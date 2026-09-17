@@ -127,9 +127,17 @@ export const AiSchedulerView: React.FC<Props> = ({
       id: 'dir-2',
       key: 'prefer_morning_core',
       title: 'تركيز المواد الأساسية في الفترة الصباحية',
-      description: 'إعطاء أولوية للفترات 1 و 2 و 3 لمواد الرياضيات، اللغة العربية، العلوم الطبيعية، والفيزياء.',
+      description: 'إعطاء أولوية للفترات 1 و 2 و 3 لمواد الرياضيات، اللغة العربية، اللغة الفرنسية (مادة أساسية)، العلوم، والفيزياء.',
       active: true,
       category: 'pedagogical',
+    },
+    {
+      id: 'dir-french-core',
+      key: 'french_core_system',
+      title: 'اعتماد الفرنسية كمادة أساسية والإنجليزية ثانوية',
+      description: 'برمجة الفرنسية 4 سا أسبوعياً + أعمال موجهة في الصباح، والإنجليزية ساعتان ثانوية وفق التراجع الوزاري الأخير.',
+      active: true,
+      category: 'ministerial',
     },
     {
       id: 'dir-3',
@@ -150,8 +158,8 @@ export const AiSchedulerView: React.FC<Props> = ({
     {
       id: 'dir-5',
       key: 'avoid_double_heavy',
-      title: 'تجنب تتابع مادتين علميتين ثقيلتين في نفس اليوم',
-      description: 'تفادي وضع حصة رياضيات تليها مباشرة حصة فيزياء لنفس القسم لتفادي الإرهاق الذهني.',
+      title: 'تجنب تتابع مادتين ثقيلتين في نفس اليوم',
+      description: 'تفادي وضع حصة رياضيات تليها مباشرة حصة فرنسية أو فيزياء لنفس القسم لتفادي الإرهاق الذهني.',
       active: true,
       category: 'pedagogical',
     },
@@ -162,7 +170,9 @@ export const AiSchedulerView: React.FC<Props> = ({
       id: 'msg-welcome',
       sender: 'ai',
       text: `مرحباً بك سيادة المدير في المساعد الذكي DALI SCHEDULER AI.
-أنا ملتزم تماماً بتوجيهاتك البيداغوجية والمنشور الوزاري رقم 154 والقرار 27 جويلية 2026:
+أنا ملتزم تماماً بالنظام الوزاري المعتمد الأصلي وتوجيهات الإدارة التربوية:
+- 🇫🇷 **اللغة الفرنسية مادة أساسية**: 4 ساعات أسبوعياً + حصة أعمال موجهة (أ.م) مع أولوية الفترات الصباحية.
+- 🇬🇧 **اللغة الإنجليزية مادة ثانوية**: ساعتان أسبوعياً بدون تفويج كلغة أجنبية ثانية.
 - ⚡ **تطبيق التوجيهات فوري ولحظي على استعمال الزمن** بمجرد تفعيلها أو كتابتها في المحادثة.
 - ✅ **تقليل الساعات الفارغة البينية للأساتذة** مفعل ومدمج في خوارزمية التوليد.
 - 🔄 **توليد خيار مختلف في كل مرة** بنمط تنويع ذكي ومريح.
@@ -439,6 +449,22 @@ export const AiSchedulerView: React.FC<Props> = ({
       );
       onApplyNewTimetable(applied.slots, applied.message);
       instantNote = applied.message;
+    } else if (
+      lower.includes('فرنسية') ||
+      lower.includes('فرنسي') ||
+      lower.includes('انجليزية') ||
+      lower.includes('انجليزي') ||
+      lower.includes('أساسية') ||
+      lower.includes('ثانوية') ||
+      lower.includes('قديم') ||
+      lower.includes('جويلية')
+    ) {
+      const updated = directives.map((d) =>
+        d.key === 'prefer_morning_core' || d.key === 'french_core_system' ? { ...d, active: true } : d
+      );
+      setDirectives(updated);
+      handleRunGeneration(true);
+      instantNote = 'تم تأكيد اعتماد الفرنسية كمادة أساسية (4 سا + أ.م) والإنجليزية كمادة ثانوية (2 سا) وتوليد استعمال الزمن فوراً.';
     } else if (lower.includes('صباح') || lower.includes('رياضيات') || lower.includes('أساسي') || lower.includes('عربية')) {
       const updated = directives.map((d) =>
         d.key === 'prefer_morning_core' ? { ...d, active: true } : d

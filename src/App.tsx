@@ -45,37 +45,56 @@ export default function App() {
   // Main State
   const [activeTab, setActiveTab] = useState<ActiveTab>('official_rules');
   const [rules, setRules] = useState<SubjectRule[]>(() => {
-    const saved = localStorage.getItem('dali_subject_rules_2026');
-    return saved ? JSON.parse(saved) : OFFICIAL_SUBJECT_RULES;
+    const saved = localStorage.getItem('dali_subject_rules_2026_v3');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Ensure French is 4 hours in saved rules, otherwise reset to official
+        const frenchRule = parsed.find((r: SubjectRule) => r.subject_id === 'french');
+        if (frenchRule && frenchRule.weekly_hours === 4) {
+          return parsed;
+        }
+      } catch (e) {}
+    }
+    return OFFICIAL_SUBJECT_RULES;
   });
 
   const [legalRules, setLegalRules] = useState<LegalRule[]>(() => {
-    const saved = localStorage.getItem('dali_legal_rules_2026');
+    const saved = localStorage.getItem('dali_legal_rules_2026_v3');
     return saved ? JSON.parse(saved) : OFFICIAL_LEGAL_RULES;
   });
 
   const [config, setConfig] = useState<InstitutionConfig>(() => {
-    const saved = localStorage.getItem('dali_institution_config_2026');
+    const saved = localStorage.getItem('dali_institution_config_2026_v3');
     return saved ? JSON.parse(saved) : DEFAULT_INSTITUTION_CONFIG;
   });
 
   const [classes, setClasses] = useState<SchoolClass[]>(() => {
-    const saved = localStorage.getItem('dali_classes_2026');
+    const saved = localStorage.getItem('dali_classes_2026_v3');
     return saved ? JSON.parse(saved) : DEFAULT_CLASSES;
   });
 
   const [teachers, setTeachers] = useState<Teacher[]>(() => {
-    const saved = localStorage.getItem('dali_teachers_2026');
-    return saved ? JSON.parse(saved) : DEFAULT_TEACHERS;
+    const saved = localStorage.getItem('dali_teachers_2026_v3');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const frTeachers = parsed.filter((t: Teacher) => t.subjectId === 'french');
+        if (frTeachers.length >= 4) {
+          return parsed;
+        }
+      } catch (e) {}
+    }
+    return DEFAULT_TEACHERS;
   });
 
   const [rooms, setRooms] = useState<Room[]>(() => {
-    const saved = localStorage.getItem('dali_rooms_2026');
+    const saved = localStorage.getItem('dali_rooms_2026_v3');
     return saved ? JSON.parse(saved) : DEFAULT_ROOMS;
   });
 
   const [slots, setSlots] = useState<TimetableSlot[]>(() => {
-    const saved = localStorage.getItem('dali_timetable_slots_2026');
+    const saved = localStorage.getItem('dali_timetable_slots_2026_v3');
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -83,7 +102,7 @@ export default function App() {
         // fallback to initial generation
       }
     }
-    // Generate initial timetable on startup
+    // Generate initial timetable on startup with restored French core curriculum
     const initialRes = generateInstitutionalTimetable(
       DEFAULT_CLASSES,
       DEFAULT_TEACHERS,
@@ -140,27 +159,27 @@ export default function App() {
 
   // Auto-save to localStorage
   useEffect(() => {
-    localStorage.setItem('dali_subject_rules_2026', JSON.stringify(rules));
+    localStorage.setItem('dali_subject_rules_2026_v3', JSON.stringify(rules));
   }, [rules]);
 
   useEffect(() => {
-    localStorage.setItem('dali_legal_rules_2026', JSON.stringify(legalRules));
+    localStorage.setItem('dali_legal_rules_2026_v3', JSON.stringify(legalRules));
   }, [legalRules]);
 
   useEffect(() => {
-    localStorage.setItem('dali_classes_2026', JSON.stringify(classes));
+    localStorage.setItem('dali_classes_2026_v3', JSON.stringify(classes));
   }, [classes]);
 
   useEffect(() => {
-    localStorage.setItem('dali_teachers_2026', JSON.stringify(teachers));
+    localStorage.setItem('dali_teachers_2026_v3', JSON.stringify(teachers));
   }, [teachers]);
 
   useEffect(() => {
-    localStorage.setItem('dali_rooms_2026', JSON.stringify(rooms));
+    localStorage.setItem('dali_rooms_2026_v3', JSON.stringify(rooms));
   }, [rooms]);
 
   useEffect(() => {
-    localStorage.setItem('dali_timetable_slots_2026', JSON.stringify(slots));
+    localStorage.setItem('dali_timetable_slots_2026_v3', JSON.stringify(slots));
   }, [slots]);
 
   // Reactive Conflict Detection
