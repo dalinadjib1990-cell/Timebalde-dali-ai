@@ -14,6 +14,12 @@ export interface GenerationDirectives {
   variationIndex?: number;
   seed?: number;
   minimizeTeacherGaps?: boolean;
+  avoidTwoHourGaps?: boolean;
+  allowSingleGapOnNecessity?: boolean;
+  avoidSingleHourShifts?: boolean;
+  clusterAnnexTeachers?: boolean;
+  respectSubjectPedagogicalDays?: boolean;
+  scheduleRemedialSlots?: boolean;
   preferMorningCore?: boolean;
   tuesdayAfternoonOff?: boolean;
   compactTeacherDays?: boolean;
@@ -29,7 +35,7 @@ interface LessonRequirement {
   subjectId: SubjectId;
   teacherId: string;
   duration: number; // 1 or 2 hours
-  type: 'course' | 'td' | 'tp' | 'sport';
+  type: 'course' | 'td' | 'tp' | 'sport' | 'remedial';
   preferredRoomType: Room['type'];
   isSplitGroup: boolean;
 }
@@ -61,6 +67,12 @@ export function generateInstitutionalTimetable(
     options.directives.filter((d) => d.active).forEach((d) => activeDirectives.add(d.key));
   }
   const minimizeTeacherGaps = options.minimizeTeacherGaps ?? (activeDirectives.has('minimize_teacher_gaps') || true);
+  const avoidTwoHourGaps = options.avoidTwoHourGaps ?? (activeDirectives.has('avoid_two_hour_gaps') || true);
+  const allowSingleGapOnNecessity = options.allowSingleGapOnNecessity ?? (activeDirectives.has('allow_single_gap_on_necessity') || true);
+  const avoidSingleHourShifts = options.avoidSingleHourShifts ?? (activeDirectives.has('avoid_single_hour_shifts') || true);
+  const clusterAnnexTeachers = options.clusterAnnexTeachers ?? (activeDirectives.has('cluster_annex_teachers') || true);
+  const respectSubjectPedagogicalDays = options.respectSubjectPedagogicalDays ?? (activeDirectives.has('respect_subject_pedagogical_days') || true);
+  const scheduleRemedialSlots = options.scheduleRemedialSlots ?? (activeDirectives.has('schedule_remedial_slots') || true);
   const preferMorningCore = options.preferMorningCore ?? (activeDirectives.has('prefer_morning_core') || true);
   const tuesdayAfternoonOff = options.tuesdayAfternoonOff ?? (activeDirectives.has('tuesday_afternoon_off') || config.tuesdayAfternoonOff);
   const compactTeacherDays = options.compactTeacherDays ?? activeDirectives.has('compact_teacher_days');
@@ -327,6 +339,44 @@ export function generateInstitutionalTimetable(
   const dayRotation = (variationIndex % daysList.length);
   const rotatedDays = [...daysList.slice(dayRotation), ...daysList.slice(0, dayRotation)];
 
+  // Helper to check if a class belongs to the Annex institution
+  const classMap = new Map(classes.map((c) => [c.id, c]));
+  const isClassAnnex = (cId: string): boolean => {
+    const c = classMap.get(cId);
+    if (!c) return false;
+    return !!c.isAnnex || (!!c.name && c.name.includes('ملحقة')) || (!!config.hasAnnex && ['2am4', '2am5', '2am6'].includes(c.id));
+  };
+
+  // Helper to accurately measure teacher gaps within morning and afternoon sessions
+  function evaluateTeacherGapsAfterSlot(
+    currentPeriods: number[],
+    newPeriod: number,
+    duration: number
+  ): { totalGaps: number; maxConsecutiveGap: number } {
+    const combined = [...currentPeriods, newPeriod];
+    if (duration === 2) combined.push(newPeriod + 1);
+    const sorted = Array.from(new Set(combined)).sort((a, b) => a - b);
+
+    let totalGaps = 0;
+    let maxConsecutiveGap = 0;
+
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const p1 = sorted[i];
+      const p2 = sorted[i + 1];
+      // Only measure gaps inside the same half-day (1-4 or 5-8)
+      // Standard lunch break (period 4 to 5) is NOT a gap
+      if ((p1 <= 4 && p2 <= 4) || (p1 >= 5 && p2 >= 5)) {
+        const gap = p2 - p1 - 1;
+        if (gap > 0) {
+          totalGaps += gap;
+          if (gap > maxConsecutiveGap) maxConsecutiveGap = gap;
+        }
+      }
+    }
+
+    return { totalGaps, maxConsecutiveGap };
+  }
+
   function getSlotOptions(req: LessonRequirement): SlotOption[] {
     const options: SlotOption[] = [];
 
@@ -344,6 +394,16 @@ export function generateInstitutionalTimetable(
         if (req.duration === 2) {
           if (p === 4) continue; // Don't span morning lunch break (11-12 & 13:30-14:30)
           if (tuesdayAfternoonOff && day === 'الثلاثاء' && p + 1 >= 5) continue;
+        }
+
+        // DIRECTIVE: Respect Subject Pedagogical Coordination Days (اليوم البيداغوجي لكل مادة)
+        if (respectSubjectPedagogicalDays && config.subjectPedagogicalDays) {
+          const pedDay = config.subjectPedagogicalDays[req.subjectId];
+          if (pedDay && day === pedDay.day) {
+            if (pedDay.periodRange === 'all_day') continue;
+            if (pedDay.periodRange === 'morning' && p <= 4) continue;
+            if (pedDay.periodRange === 'afternoon' && p >= 5) continue;
+          }
         }
 
         // Score heuristic:
@@ -370,35 +430,118 @@ export function generateInstitutionalTimetable(
           score += !isMorning ? 30 : 5;
         }
 
-        // DIRECTIVE: Minimize Teacher Gaps (تقليل الساعات الفارغة البينية للأستاذ)
-        if (minimizeTeacherGaps) {
-          const tdKey = `${req.teacherId}_${day}`;
-          const currentTeacherPeriods = teacherScheduleMap.get(tdKey) || [];
+        // Remedial slots preferred on designated remedial day & period
+        if (req.type === 'remedial') {
+          if (config.remedialDay && day === config.remedialDay) {
+            score += 85;
+            if (config.remedialPeriod && p === config.remedialPeriod) {
+              score += 90;
+            }
+          }
+        }
+
+        const tdKey = `${req.teacherId}_${day}`;
+        const currentTeacherPeriods = teacherScheduleMap.get(tdKey) || [];
+
+        // DIRECTIVE: Annex Teacher Multi-School Adaptivity (تكييف أساتذة الملحقة لتفادي التنقل وحصره في وقت الفراغ)
+        if (clusterAnnexTeachers) {
+          const reqIsAnnex = isClassAnnex(req.classId);
           if (currentTeacherPeriods.length > 0) {
-            // Check if placing here is immediately adjacent to existing classes
+            const teacherDaySlots = assignedSlots.filter((s) => s.teacherId === req.teacherId && s.day === day);
+            const halfDaySlots = teacherDaySlots.filter((s) => (p <= 4 ? s.period <= 4 : s.period >= 5));
+
+            // Prevent mixing Annex and Main campus within the same morning or afternoon
+            for (const s of halfDaySlots) {
+              const slotIsAnnex = isClassAnnex(s.classId);
+              if (reqIsAnnex !== slotIsAnnex) {
+                score -= 800; // Strictly forbidden: teacher must not travel back and forth within a single half-day
+                break;
+              }
+            }
+
+            // High bonus for clustering lessons of the same institution together
+            if (halfDaySlots.some((s) => isClassAnnex(s.classId) === reqIsAnnex)) {
+              score += 55;
+            }
+          }
+        }
+
+        // DIRECTIVE: Minimize Teacher Gaps & Avoid 2-hour gaps in middle
+        // RULE: الأفضلية القصوى لـ 0 فراغ بيني، مع التسامح بساعة واحدة فراغ كحد أقصى عند الضرورة القصوى لتخفيف الضغط على الخوارزميات، وحظر ساعتين فراغ منعاً باتاً.
+        if (minimizeTeacherGaps || avoidTwoHourGaps || allowSingleGapOnNecessity) {
+          if (currentTeacherPeriods.length > 0) {
             const isAdjacent =
               currentTeacherPeriods.includes(p - 1) ||
               currentTeacherPeriods.includes(p + req.duration);
 
-            if (isAdjacent) {
-              score += 65; // High bonus for compact, contiguous teaching blocks!
-            } else {
-              // Check if it creates a 1-hour isolated gap
-              const minP = Math.min(...currentTeacherPeriods);
-              const maxP = Math.max(...currentTeacherPeriods);
-              if (p > minP && p < maxP) {
-                score -= 80; // Heavy penalty for creating holes in the middle of teacher's day
+            const gapEval = evaluateTeacherGapsAfterSlot(
+              currentTeacherPeriods,
+              p,
+              req.duration
+            );
+
+            if (gapEval.totalGaps === 0) {
+              // الأفضلية التامة: جدول متصل 100% بدون أي ساعة فراغ
+              score += isAdjacent ? 110 : 85;
+            } else if (gapEval.maxConsecutiveGap >= 2) {
+              // ممنوع تماماً: ساعتان فراغ في المنتصف (أو أكثر) داخل نفس الفترة
+              score -= 350;
+            } else if (gapEval.totalGaps === 1 && gapEval.maxConsecutiveGap === 1) {
+              // تخفيف الضغط على الخوارزمية: مسموح بساعة واحدة فقط خلال اليوم عند الضرورة القصوى
+              if (allowSingleGapOnNecessity) {
+                score -= 20; // خصم طفيف يفك الاختناق دون ترجيحه على خيار 0 فراغ
               } else {
-                score -= 25; // Mild penalty for isolated sessions far away
+                score -= 75;
               }
+            } else {
+              // أكثر من ساعة فراغ واحدة للأستاذ في نفس اليوم
+              score -= 280;
+            }
+          }
+        }
+
+        // DIRECTIVE: Avoid 1-hour shifts for teachers (تجنب ساعة واحدة في المساء أو الصباح - الأستاذ لا يأتي لساعة واحدة)
+        if (avoidSingleHourShifts) {
+          const morningPeriods = currentTeacherPeriods.filter((x) => x <= 4);
+          const afternoonPeriods = currentTeacherPeriods.filter((x) => x >= 5);
+
+          if (p <= 4) { // Placing in morning
+            if (morningPeriods.length === 0) {
+              if (req.duration === 1) {
+                if (afternoonPeriods.length > 0) {
+                  score -= 135; // Coming in morning for only 1 solitary hour
+                } else {
+                  score -= 105; // Opening a new day for just 1 hour
+                }
+              } else {
+                score += 45; // 2h block
+              }
+            } else if (morningPeriods.length === 1) {
+              score += 95; // Joins isolated hour, turning it into a comfortable 2-hour session
+            } else if (morningPeriods.length >= 2) {
+              score += 35;
+            }
+          } else { // Placing in afternoon (p >= 5)
+            if (afternoonPeriods.length === 0) {
+              if (req.duration === 1) {
+                if (morningPeriods.length > 0) {
+                  score -= 150; // Staying or returning after lunch for only 1 solitary afternoon hour
+                } else {
+                  score -= 125; // Coming to school in the afternoon for only 1 hour
+                }
+              } else {
+                score += 45; // 2h block
+              }
+            } else if (afternoonPeriods.length === 1) {
+              score += 95; // Joins isolated afternoon hour, making it a comfortable 2-hour session
+            } else if (afternoonPeriods.length >= 2) {
+              score += 35;
             }
           }
         }
 
         // DIRECTIVE: Compact Teacher Schedules (تجميع أيام عمل الأستاذ)
         if (compactTeacherDays) {
-          const tdKey = `${req.teacherId}_${day}`;
-          const currentTeacherPeriods = teacherScheduleMap.get(tdKey) || [];
           if (currentTeacherPeriods.length > 0 && currentTeacherPeriods.length < 5) {
             score += 30; // Encourage filling this day before opening new days
           }
@@ -436,7 +579,6 @@ export function generateInstitutionalTimetable(
 
   // 7. CSP Greedy-Backtracking Placement
   const unassignedLessons: LessonRequirement[] = [];
-  const classMap = new Map(classes.map((c) => [c.id, c]));
 
   for (const req of requirements) {
     const cls = classMap.get(req.classId);
@@ -488,6 +630,7 @@ export function generateInstitutionalTimetable(
         type: req.type,
         isGroupSplit: req.isSplitGroup,
         group: req.isSplitGroup ? 1 : undefined,
+        isAnnex: isClassAnnex(req.classId),
       };
 
       assignedSlots.push(slot1);
@@ -518,6 +661,7 @@ export function generateInstitutionalTimetable(
           period: p2,
           type: req.type,
           isGroupSplit: req.isSplitGroup,
+          isAnnex: isClassAnnex(req.classId),
         };
         assignedSlots.push(slot2);
         teacherOccupied.add(tKey2);
@@ -622,13 +766,9 @@ export function applyDirectivesInstantlyToExistingTimetable(
   const changeNotes: string[] = [];
 
   const activeKeys = new Set(directives.filter((d) => d.active).map((d) => d.key));
-  const days: ('sunday' | 'monday' | 'tuesday' | 'wednesday' | 'thursday')[] = [
-    'sunday',
-    'monday',
-    'tuesday',
-    'wednesday',
-    'thursday',
-  ];
+  const days: string[] = config.days && config.days.length > 0
+    ? config.days
+    : ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'];
 
   // Helper to test if a slot can safely move to target day/period
   const canMoveSlot = (
@@ -638,8 +778,18 @@ export function applyDirectivesInstantlyToExistingTimetable(
     currentWorkingSlots: TimetableSlot[]
   ): boolean => {
     // Check if target is Tuesday afternoon when tuesday_afternoon_off is active
-    if (activeKeys.has('tuesday_afternoon_off') && targetDay === 'tuesday' && targetPeriod >= 5) {
+    if (activeKeys.has('tuesday_afternoon_off') && targetDay === 'الثلاثاء' && targetPeriod >= 5) {
       return false;
+    }
+
+    // Respect Subject Pedagogical Coordination Days
+    if (config.subjectPedagogicalDays) {
+      const pedDay = config.subjectPedagogicalDays[candidateSlot.subjectId];
+      if (pedDay && targetDay === pedDay.day) {
+        if (pedDay.periodRange === 'all_day') return false;
+        if (pedDay.periodRange === 'morning' && targetPeriod <= 4) return false;
+        if (pedDay.periodRange === 'afternoon' && targetPeriod >= 5) return false;
+      }
     }
 
     // Check teacher availability & conflicts
@@ -672,13 +822,13 @@ export function applyDirectivesInstantlyToExistingTimetable(
   // 1. Directive: Free Tuesday Afternoon (تفريغ مساء الثلاثاء للندوات)
   if (activeKeys.has('tuesday_afternoon_off')) {
     let tuesdayMoved = 0;
-    const tuesdayAfternoonSlots = slots.filter((s) => s.day === 'tuesday' && s.period >= 5);
+    const tuesdayAfternoonSlots = slots.filter((s) => s.day === 'الثلاثاء' && s.period >= 5);
 
     for (const tSlot of tuesdayAfternoonSlots) {
       let moved = false;
       // Search for an available slot in other days
-      for (const d of ['sunday', 'monday', 'wednesday', 'thursday', 'tuesday'] as const) {
-        const maxP = d === 'tuesday' ? 4 : 8;
+      for (const d of days) {
+        const maxP = d === 'الثلاثاء' ? 4 : 8;
         for (let p = 1; p <= maxP; p++) {
           if (canMoveSlot(tSlot, d, p, slots)) {
             slots = slots.map((s) =>
@@ -694,7 +844,7 @@ export function applyDirectivesInstantlyToExistingTimetable(
       }
     }
     if (tuesdayMoved > 0) {
-      changeNotes.push(`تم نقل وتفريغ ${tuesdayMoved} حصة من مساء الثلاثاء إلى فترات أخرى`);
+      changeNotes.push(`تم تفريغ مساء الثلاثاء ونقل ${tuesdayMoved} حصة`);
     }
   }
 
@@ -741,8 +891,8 @@ export function applyDirectivesInstantlyToExistingTimetable(
     }
   }
 
-  // 3. Directive: Minimize Teacher Gaps (تقليل الساعات الفارغة البينية للأساتذة)
-  if (activeKeys.has('minimize_teacher_gaps')) {
+  // 3. Directive: Minimize Teacher Gaps & Avoid 2-hour gaps (تقليل الساعات الفارغة وسد فراغ ساعتين مع التسامح بساعة واحدة للضرورة)
+  if (activeKeys.has('minimize_teacher_gaps') || activeKeys.has('avoid_two_hour_gaps') || activeKeys.has('allow_single_gap_on_necessity')) {
     let gapsReduced = 0;
     for (const teacher of teachers) {
       for (const day of days) {
@@ -755,10 +905,11 @@ export function applyDirectivesInstantlyToExistingTimetable(
           const minP = Math.min(...periods);
           const maxP = Math.max(...periods);
 
-          // Find if there is a gap inside the teacher's day
+          // Find if there is a gap inside the teacher's morning or afternoon
           for (let p = minP + 1; p < maxP; p++) {
+            if (p === 4 || p === 5) continue; // standard lunch interval
             if (!periods.includes(p)) {
-              // Found gap at period 'p'. Try to shift the later slot (p > p) into this empty period 'p'
+              // Found empty period 'p' in teacher's schedule. Try to shift a later slot
               const laterSlot = teacherDaySlots.find((s) => s.period > p);
               if (laterSlot && canMoveSlot(laterSlot, day, p, slots)) {
                 slots = slots.map((s) =>
@@ -774,7 +925,7 @@ export function applyDirectivesInstantlyToExistingTimetable(
       }
     }
     if (gapsReduced > 0) {
-      changeNotes.push(`تم تجميع الحصص وسد ${gapsReduced} ساعة فارغة بينية للأساتذة`);
+      changeNotes.push(`تم سد ${gapsReduced} فراغ بيني للأساتذة بنجاح`);
     }
   }
 

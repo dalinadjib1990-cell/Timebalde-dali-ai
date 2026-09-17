@@ -29,7 +29,7 @@ export function exportTimetableToExcel(
   masterRows.push([`المؤسسة: ${config.name}`, `السنة الدراسية: ${config.academicYear}`]);
   masterRows.push(['']);
 
-  const header = ['القسم', 'المستوى', 'اليوم', 'الفترة', 'التوقيت', 'المادة', 'الأستاذ', 'القاعة / المخبر', 'نوع الحصة'];
+  const header = ['القسم', 'المستوى', 'اليوم', 'الفترة', 'التوقيت', 'المادة', 'الأستاذ', 'القاعة / المخبر', 'نوع الحصة', 'المقر / الملحقة'];
   masterRows.push(header);
 
   for (const s of slots) {
@@ -38,6 +38,7 @@ export function exportTimetableToExcel(
     const room = roomMap.get(s.roomId);
     const periodDef = config.periods.find((p) => p.id === s.period);
     const subjName = SUBJECT_METADATA[s.subjectId]?.name || s.subjectId;
+    const isAnnex = s.isAnnex || cls?.isAnnex;
 
     masterRows.push([
       cls?.name || s.classId,
@@ -48,7 +49,16 @@ export function exportTimetableToExcel(
       subjName,
       teacher?.name || '',
       room?.name || '',
-      s.type === 'tp' ? 'أعمال تطبيقية (TP)' : s.type === 'td' ? 'أعمال موجهة (TD)' : s.type === 'sport' ? 'تربية بدنية' : 'درس عادي',
+      s.type === 'remedial'
+        ? 'استدراك ودعم تربوي (أحمر)'
+        : s.type === 'tp'
+        ? 'أعمال تطبيقية مخبرية (TP - أخضر)'
+        : s.type === 'td'
+        ? 'أعمال موجهة (TD - أصفر)'
+        : s.type === 'sport'
+        ? 'تربية بدنية ورياضية'
+        : 'حصة نظرية عادية',
+      isAnnex ? 'الملحقة (2AM)' : 'المؤسسة الأم',
     ]);
   }
 
@@ -151,14 +161,19 @@ export function printElement(elementId: string) {
       <meta charset="utf-8">
       <title>طباعة استعمال الزمن — DALI TIMETABLE AI</title>
       <style>
-        body { font-family: system-ui, -apple-system, sans-serif; direction: rtl; padding: 20px; color: #111; }
+        body { font-family: system-ui, -apple-system, 'Segoe UI', Tahoma, sans-serif; direction: rtl; padding: 20px; color: #111; }
         table { width: 100%; border-collapse: collapse; margin: 15px 0; }
         th, td { border: 1px solid #444; padding: 8px 6px; text-align: center; font-size: 11px; }
         th { background: #f0fdf4; color: #166534; font-weight: 700; }
         .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; }
+        .slot-remedial { border-right: 4px solid #ef4444 !important; background-color: #fef2f2 !important; color: #991b1b !important; }
+        .slot-td { border-right: 4px solid #f59e0b !important; background-color: #fffbeb !important; color: #92400e !important; }
+        .slot-tp { border-right: 4px solid #10b981 !important; background-color: #ecfdf5 !important; color: #065f46 !important; }
+        .slot-annex { border-left: 3px solid #8b5cf6 !important; }
         @media print {
-          @page { size: landscape; margin: 10mm; }
+          @page { size: landscape; margin: 8mm; }
           body { padding: 0; }
+          button, .no-print { display: none !important; }
         }
       </style>
     </head>

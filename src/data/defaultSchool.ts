@@ -1,5 +1,43 @@
 import { InstitutionConfig, SchoolClass, Teacher, Room } from '../types';
 
+export function getPeriodsForShift(shift: 'standard' | 'early_13h' | 'late_14h') {
+  const morningPeriods = [
+    { id: 1, name: 'الحصة 1', timeRange: '08:00 - 09:00', isMorning: true },
+    { id: 2, name: 'الحصة 2', timeRange: '09:00 - 10:00', isMorning: true },
+    { id: 3, name: 'الحصة 3', timeRange: '10:00 - 11:00', isMorning: true },
+    { id: 4, name: 'الحصة 4', timeRange: '11:00 - 12:00', isMorning: true },
+  ];
+
+  if (shift === 'early_13h') {
+    return [
+      ...morningPeriods,
+      { id: 5, name: 'الحصة 5', timeRange: '13:00 - 14:00', isMorning: false },
+      { id: 6, name: 'الحصة 6', timeRange: '14:00 - 15:00', isMorning: false },
+      { id: 7, name: 'الحصة 7', timeRange: '15:00 - 16:00', isMorning: false },
+      { id: 8, name: 'الحصة 8', timeRange: '16:00 - 17:00', isMorning: false },
+    ];
+  }
+
+  if (shift === 'late_14h') {
+    return [
+      ...morningPeriods,
+      { id: 5, name: 'الحصة 5', timeRange: '14:00 - 15:00', isMorning: false },
+      { id: 6, name: 'الحصة 6', timeRange: '15:00 - 16:00', isMorning: false },
+      { id: 7, name: 'الحصة 7', timeRange: '16:00 - 17:00', isMorning: false },
+      { id: 8, name: 'الحصة 8', timeRange: '17:00 - 18:00', isMorning: false },
+    ];
+  }
+
+  // Standard 13:30 - 17:30
+  return [
+    ...morningPeriods,
+    { id: 5, name: 'الحصة 5', timeRange: '13:30 - 14:30', isMorning: false },
+    { id: 6, name: 'الحصة 6', timeRange: '14:30 - 15:30', isMorning: false },
+    { id: 7, name: 'الحصة 7', timeRange: '15:30 - 16:30', isMorning: false },
+    { id: 8, name: 'الحصة 8', timeRange: '16:30 - 17:30', isMorning: false },
+  ];
+}
+
 export const DEFAULT_INSTITUTION_CONFIG: InstitutionConfig = {
   name: 'متوسطة العربي بن مهيدي النموذجية',
   academicYear: '2026/2027',
@@ -7,19 +45,30 @@ export const DEFAULT_INSTITUTION_CONFIG: InstitutionConfig = {
   educationDirectorate: 'مديرية التربية لولاية الجزائر وسط',
   commune: 'الجزائر العاصمة',
   days: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'],
-  periods: [
-    { id: 1, name: 'الحصة 1', timeRange: '08:00 - 09:00', isMorning: true },
-    { id: 2, name: 'الحصة 2', timeRange: '09:00 - 10:00', isMorning: true },
-    { id: 3, name: 'الحصة 3', timeRange: '10:00 - 11:00', isMorning: true },
-    { id: 4, name: 'الحصة 4', timeRange: '11:00 - 12:00', isMorning: true },
-    { id: 5, name: 'الحصة 5', timeRange: '13:30 - 14:30', isMorning: false },
-    { id: 6, name: 'الحصة 6', timeRange: '14:30 - 15:30', isMorning: false },
-    { id: 7, name: 'الحصة 7', timeRange: '15:30 - 16:30', isMorning: false },
-    { id: 8, name: 'الحصة 8', timeRange: '16:30 - 17:30', isMorning: false },
-  ],
+  periods: getPeriodsForShift('standard'),
   tuesdayAfternoonOff: true,
   enableAmazigh: false,
   enableComputerScience: true,
+  afternoonShiftMode: 'standard',
+  hasAnnex: true,
+  annexName: 'ملحقة المؤسسة (3 أقسام 2 متوسط)',
+  remedialDay: 'الأربعاء',
+  remedialPeriod: 7,
+  subjectPedagogicalDays: {
+    arabic: { day: 'الأحد', periodRange: 'afternoon' },
+    math: { day: 'الثلاثاء', periodRange: 'morning' },
+    french: { day: 'الخميس', periodRange: 'morning' },
+    english: { day: 'الخميس', periodRange: 'afternoon' },
+    science: { day: 'الاثنين', periodRange: 'morning' },
+    physics: { day: 'الأربعاء', periodRange: 'afternoon' },
+    history: { day: 'الأحد', periodRange: 'morning' },
+    geography: { day: 'الأحد', periodRange: 'morning' },
+    pe: { day: 'الثلاثاء', periodRange: 'afternoon' },
+    islamic: { day: 'الخميس', periodRange: 'afternoon' },
+    civic: { day: 'الاثنين', periodRange: 'afternoon' },
+    art_music: { day: 'الأربعاء', periodRange: 'morning' },
+    computer: { day: 'الخميس', periodRange: 'morning' },
+  },
 };
 
 // 20 classes: 5 in 1AM, 6 in 2AM, 5 in 3AM, 4 in 4AM
@@ -31,13 +80,13 @@ export const DEFAULT_CLASSES: SchoolClass[] = [
   { id: '1am4', name: '1AM4', level: '1AM', studentCount: 34, assignedRoomId: 'room-04' },
   { id: '1am5', name: '1AM5', level: '1AM', studentCount: 36, assignedRoomId: 'room-05' },
 
-  // 2 متوسط (6 أقسام)
+  // 2 متوسط (6 أقسام - منها 3 أقسام في ملحقة المؤسسة)
   { id: '2am1', name: '2AM1', level: '2AM', studentCount: 38, assignedRoomId: 'room-06' },
   { id: '2am2', name: '2AM2', level: '2AM', studentCount: 37, assignedRoomId: 'room-07' },
   { id: '2am3', name: '2AM3', level: '2AM', studentCount: 35, assignedRoomId: 'room-08' },
-  { id: '2am4', name: '2AM4', level: '2AM', studentCount: 36, assignedRoomId: 'room-09' },
-  { id: '2am5', name: '2AM5', level: '2AM', studentCount: 38, assignedRoomId: 'room-10' },
-  { id: '2am6', name: '2AM6', level: '2AM', studentCount: 34, assignedRoomId: 'room-11' },
+  { id: '2am4', name: '2AM4 (ملحقة)', level: '2AM', studentCount: 36, assignedRoomId: 'room-09', isAnnex: true, annexName: 'ملحقة المؤسسة' },
+  { id: '2am5', name: '2AM5 (ملحقة)', level: '2AM', studentCount: 38, assignedRoomId: 'room-10', isAnnex: true, annexName: 'ملحقة المؤسسة' },
+  { id: '2am6', name: '2AM6 (ملحقة)', level: '2AM', studentCount: 34, assignedRoomId: 'room-11', isAnnex: true, annexName: 'ملحقة المؤسسة' },
 
   // 3 متوسط (5 أقسام)
   { id: '3am1', name: '3AM1', level: '3AM', studentCount: 35, assignedRoomId: 'room-12' },

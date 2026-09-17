@@ -20,6 +20,7 @@ import {
   Trash2,
   Save,
   X,
+  Mic,
 } from 'lucide-react';
 import {
   TimetableSlot,
@@ -49,6 +50,7 @@ interface Props {
   onDeleteSlot?: (slotId: string) => void;
   onClearAllSlots?: () => void;
   onSaveVersion?: (name?: string, notes?: string) => void;
+  onOpenVoiceAssistant?: () => void;
 }
 
 type ViewMode = 'class' | 'teacher' | 'room' | 'master' | 'td_tp';
@@ -67,6 +69,7 @@ export const TimetablesView: React.FC<Props> = ({
   onDeleteSlot,
   onClearAllSlots,
   onSaveVersion,
+  onOpenVoiceAssistant,
 }) => {
   const [viewMode, setViewMode] = useState<ViewMode>('class');
   const [selectedClassId, setSelectedClassId] = useState<string>(classes[0]?.id || '1am1');
@@ -250,6 +253,18 @@ export const TimetablesView: React.FC<Props> = ({
             </button>
           )}
 
+          {onOpenVoiceAssistant && (
+            <button
+              id="voice-control-timetable-btn"
+              onClick={onOpenVoiceAssistant}
+              className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-[#d4af37]/20 to-[#b8972e]/20 hover:from-[#d4af37]/35 hover:to-[#b8972e]/35 text-[#d4af37] border border-[#d4af37]/60 rounded-xl text-xs font-bold transition-all shadow-sm cursor-pointer animate-pulse hover:animate-none"
+              title="التحكم الصوتي الفوري في الحصص: تحدث لتحريك ساعة أو تغييرها فوراً"
+            >
+              <Mic className="w-3.5 h-3.5 text-[#d4af37]" />
+              <span>🎙️ تحكم صوتي فوري</span>
+            </button>
+          )}
+
           <button
             id="print-timetable-btn"
             onClick={handlePrint}
@@ -403,6 +418,33 @@ export const TimetablesView: React.FC<Props> = ({
           </div>
         </div>
 
+        {/* Color Coding Legend */}
+        <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 bg-[#0e0e0e] border border-[#222] rounded-xl text-xs">
+          <div className="flex items-center gap-1.5 text-[#888] font-bold">
+            <span>دليل الألوان والأنشطة:</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5 bg-red-950/30 text-red-300 border border-red-500/40 px-2 py-0.5 rounded-lg text-[11px] font-bold">
+              <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse"></span>
+              <span>استدراك ودعم تربوي (أحمر)</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-amber-950/30 text-amber-300 border border-amber-400/40 px-2 py-0.5 rounded-lg text-[11px] font-bold">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+              <span>أعمال موجهة TD (أصفر)</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-emerald-950/30 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-lg text-[11px] font-bold">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+              <span>أعمال تطبيقية TP علوم/تكنولوجيا (أخضر)</span>
+            </div>
+            {config.hasAnnex && (
+              <div className="flex items-center gap-1.5 bg-purple-950/30 text-purple-300 border border-purple-500/40 px-2 py-0.5 rounded-lg text-[11px] font-bold">
+                <span>🏢</span>
+                <span>أقسام الملحقة (2AM4, 2AM5, 2AM6)</span>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Timetable Grid Table (Class / Teacher / Room / TD-TP) */}
         {viewMode !== 'master' ? (
           <div className="overflow-x-auto">
@@ -498,6 +540,28 @@ export const TimetablesView: React.FC<Props> = ({
                                   const cls = classMap.get(slot.classId);
                                   const room = roomMap.get(slot.roomId);
                                   const isSelected = selectedMovingSlot?.id === slot.id;
+                                  const isRemedial = slot.type === 'remedial';
+                                  const isTd = slot.type === 'td';
+                                  const isTp = slot.type === 'tp';
+                                  const isAnnex = slot.isAnnex || cls?.isAnnex || cls?.name?.includes('ملحقة');
+
+                                  // User requested color coding:
+                                  // Remedial: Red, TD: Yellow, TP: Green, Regular: Subject Color
+                                  const slotColor = isRemedial
+                                    ? '#ef4444'
+                                    : isTd
+                                    ? '#eab308'
+                                    : isTp
+                                    ? '#10b981'
+                                    : meta?.defaultColor || '#d4af37';
+
+                                  const bgTint = isRemedial
+                                    ? 'bg-red-950/30 border-red-500/50'
+                                    : isTd
+                                    ? 'bg-amber-950/25 border-amber-400/50'
+                                    : isTp
+                                    ? 'bg-emerald-950/25 border-emerald-500/50'
+                                    : 'bg-[#121212] border-[#222]';
 
                                   return (
                                     <div
@@ -506,28 +570,40 @@ export const TimetablesView: React.FC<Props> = ({
                                         e.stopPropagation();
                                         handleSlotClick(slot);
                                       }}
-                                      className={`p-2 rounded-xl text-right transition-all cursor-pointer shadow-md relative bg-[#121212] border border-[#222] ${
+                                      className={`p-2 rounded-xl text-right transition-all cursor-pointer shadow-md relative border ${bgTint} ${
                                         isSelected
                                           ? 'ring-2 ring-[#d4af37] scale-102 z-10 bg-[#1a120a]'
-                                          : 'hover:border-[#444]'
+                                          : 'hover:border-[#555]'
                                       }`}
                                       style={{
-                                        borderRight: `4px solid ${meta?.defaultColor || '#d4af37'}`,
+                                        borderRight: `4px solid ${slotColor}`,
                                       }}
                                     >
                                       <div className="flex items-center justify-between">
                                         <div
-                                          className="font-bold text-xs"
-                                          style={{ color: meta?.defaultColor || '#e0e0e0' }}
+                                          className="font-bold text-xs flex items-center gap-1"
+                                          style={{ color: slotColor }}
                                         >
                                           {meta?.name || slot.subjectId}
+                                          {isAnnex && (
+                                            <span className="text-[8px] bg-purple-900/60 text-purple-200 border border-purple-400/40 font-bold px-1 rounded">
+                                              ملحقة
+                                            </span>
+                                          )}
                                         </div>
-                                        {slot.type === 'tp' ? (
-                                          <span className="text-[9px] bg-[#0c192c] text-[#60a5fa] border border-[#60a5fa]/30 font-bold px-1 rounded">
+                                        {isRemedial ? (
+                                          <span className="text-[9px] bg-red-600/25 text-red-300 border border-red-500/50 font-bold px-1 rounded flex items-center gap-0.5">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                                            استدراك
+                                          </span>
+                                        ) : isTp ? (
+                                          <span className="text-[9px] bg-emerald-600/25 text-emerald-300 border border-emerald-500/50 font-bold px-1 rounded flex items-center gap-0.5">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                                             TP مخبر
                                           </span>
-                                        ) : slot.type === 'td' ? (
-                                          <span className="text-[9px] bg-[#1a120a] text-[#d4af37] border border-[#d4af37]/30 font-bold px-1 rounded">
+                                        ) : isTd ? (
+                                          <span className="text-[9px] bg-amber-500/25 text-amber-300 border border-amber-400/50 font-bold px-1 rounded flex items-center gap-0.5">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                                             TD تفويج
                                           </span>
                                         ) : slot.type === 'sport' ? (
@@ -758,9 +834,10 @@ export const TimetablesView: React.FC<Props> = ({
                   onChange={(e) => setNewSlotType(e.target.value as any)}
                   className="w-full p-2 bg-[#181818] border border-[#333] rounded-xl text-white outline-hidden focus:border-[#d4af37]"
                 >
-                  <option value="course">حصة عادية كاملة (Course)</option>
-                  <option value="td">أعمال موجهة فوج مصغر (TD)</option>
-                  <option value="tp">أعمال تطبيقية مخبرية (TP)</option>
+                  <option value="course">حصة نظرية عادية كاملة (Course)</option>
+                  <option value="td">أعمال موجهة فوج مصغر (TD - أصفر)</option>
+                  <option value="tp">أعمال تطبيقية مخابر علوم/تكنولوجيا (TP - أخضر)</option>
+                  <option value="remedial">استدراك ودعم تربوي (Remedial - أحمر)</option>
                   <option value="sport">تربية بدنية ورياضية (Sport)</option>
                 </select>
               </div>

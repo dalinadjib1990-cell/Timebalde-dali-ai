@@ -66,6 +66,11 @@ export interface PeriodDefinition {
   isMorning: boolean;
 }
 
+export interface SubjectPedagogicalDay {
+  day: string;
+  periodRange: 'morning' | 'afternoon' | 'all_day';
+}
+
 export interface InstitutionConfig {
   name: string;
   academicYear: string;
@@ -77,6 +82,12 @@ export interface InstitutionConfig {
   tuesdayAfternoonOff: boolean;
   enableAmazigh: boolean;
   enableComputerScience: boolean;
+  afternoonShiftMode?: 'standard' | 'early_13h' | 'late_14h'; // 13:00-16:00 / 14:00-17:00 / 13:30-16:30
+  hasAnnex?: boolean; // مؤسسة ملحقة
+  annexName?: string;
+  remedialDay?: string; // يوم الاستدراك
+  remedialPeriod?: number; // حصة الاستدراك
+  subjectPedagogicalDays?: Partial<Record<SubjectId, SubjectPedagogicalDay>>;
 }
 
 export interface SchoolClass {
@@ -86,6 +97,8 @@ export interface SchoolClass {
   studentCount: number;
   assignedRoomId?: string;
   hasAmazigh?: boolean;
+  isAnnex?: boolean; // قسم تابع لملحقة
+  annexName?: string;
 }
 
 export interface Teacher {
@@ -100,6 +113,8 @@ export interface Teacher {
   color?: string;
   phone?: string;
   notes?: string;
+  isMultiSchool?: boolean; // أستاذ منتدب أو يدرس بين مؤسستين
+  teachesInAnnex?: boolean; // يدرس في ملحقة
 }
 
 export interface Room {
@@ -118,11 +133,12 @@ export interface TimetableSlot {
   roomId: string;
   day: string;
   period: number;
-  type: 'course' | 'td' | 'tp' | 'sport';
+  type: 'course' | 'td' | 'tp' | 'sport' | 'remedial';
   isGroupSplit: boolean;
   group?: 1 | 2;
   weekParity?: 'all' | 'odd' | 'even';
   isLocked?: boolean;
+  isAnnex?: boolean;
 }
 
 export interface Conflict {
@@ -201,5 +217,41 @@ export interface LegalValidationReport {
   totalSlots: number;
   items: ValidationItem[];
   generatedAt: string;
+}
+
+export type VoiceCommandActionType =
+  | 'MOVE_SLOT'
+  | 'SWAP_SLOTS'
+  | 'DELETE_SLOT'
+  | 'ADD_SLOT'
+  | 'CLEAR_ALL'
+  | 'REGENERATE'
+  | 'MINIMIZE_GAPS'
+  | 'REBALANCE'
+  | 'SAVE_VERSION'
+  | 'TUESDAY_OFF'
+  | 'INFO'
+  | 'UNKNOWN';
+
+export interface VoiceCommandExecutionResult {
+  success: boolean;
+  action: VoiceCommandActionType;
+  spokenFeedback: string;
+  displayMessage: string;
+  affectedSlotsCount?: number;
+  targetSlot?: TimetableSlot;
+  previousSlots?: TimetableSlot[];
+  conflictsIntroduced?: number;
+  conflictsResolved?: number;
+}
+
+export interface VoiceCommandLogItem {
+  id: string;
+  timestamp: string;
+  transcript: string;
+  action: VoiceCommandActionType;
+  spokenFeedback: string;
+  success: boolean;
+  previousSlotsBackup?: TimetableSlot[];
 }
 

@@ -11,6 +11,8 @@ import {
   ShieldCheck,
   UploadCloud,
   Layers,
+  Building2,
+  Brain,
 } from 'lucide-react';
 import { soundManager } from '../services/soundService';
 
@@ -18,6 +20,8 @@ export type ActiveTab =
   | 'official_rules'
   | 'timetables'
   | 'ai_scheduler'
+  | 'advisor'
+  | 'institution'
   | 'teachers'
   | 'classes'
   | 'rooms'
@@ -30,6 +34,7 @@ interface Props {
   onSelectTab: (tab: ActiveTab) => void;
   conflictCount: number;
   onOpenDocumentUpdater: () => void;
+  onOpenVoiceAssistant?: () => void;
 }
 
 export const Navbar: React.FC<Props> = ({
@@ -37,6 +42,7 @@ export const Navbar: React.FC<Props> = ({
   onSelectTab,
   conflictCount,
   onOpenDocumentUpdater,
+  onOpenVoiceAssistant,
 }) => {
   const tabs = [
     {
@@ -55,6 +61,17 @@ export const Navbar: React.FC<Props> = ({
       name: 'المولد الذكي و DALI AI',
       icon: Sparkles,
       highlight: true,
+    },
+    {
+      id: 'advisor' as ActiveTab,
+      name: 'رأي الذكاء الاصطناعي والإحصائيات',
+      icon: Brain,
+      badge: 'تشخيص النصاب',
+    },
+    {
+      id: 'institution' as ActiveTab,
+      name: 'بيانات المؤسسة والملحقة',
+      icon: Building2,
     },
     {
       id: 'teachers' as ActiveTab,
@@ -113,6 +130,21 @@ export const Navbar: React.FC<Props> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {onOpenVoiceAssistant && (
+            <button
+              id="open-voice-assistant-nav-btn"
+              onClick={() => {
+                soundManager.playClick();
+                onOpenVoiceAssistant();
+              }}
+              className="flex items-center gap-2 px-3.5 py-1.5 bg-gradient-to-r from-[#d4af37]/20 to-[#b8972e]/20 hover:from-[#d4af37]/30 hover:to-[#b8972e]/30 border border-[#d4af37]/60 text-[#d4af37] text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer animate-pulse hover:animate-none"
+              title="التحكم الصوتي الفوري في الحصص واستعمال الزمن للمدير"
+            >
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+              <span>🎙️ التحكم الصوتي</span>
+            </button>
+          )}
+
           <button
             id="open-doc-updater-nav-btn"
             onClick={() => {

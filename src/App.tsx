@@ -13,8 +13,12 @@ import { RoomsManagementView } from './components/RoomsManagementView';
 import { LegalRulesView } from './components/LegalRulesView';
 import { ConflictsView } from './components/ConflictsView';
 import { LegalValidationView } from './components/LegalValidationView';
+import { ScheduleAdvisorView } from './components/ScheduleAdvisorView';
+import { InstitutionSetupView } from './components/InstitutionSetupView';
 import { DocumentUpdaterModal } from './components/DocumentUpdaterModal';
 import { IslamicTopBar } from './components/IslamicTopBar';
+import { VoiceAssistantModal } from './components/VoiceAssistantModal';
+import { VoiceFloatingTrigger } from './components/VoiceFloatingTrigger';
 import { soundManager } from './services/soundService';
 
 import {
@@ -128,6 +132,7 @@ export default function App() {
   });
 
   const [showDocumentUpdater, setShowDocumentUpdater] = useState(false);
+  const [showVoiceAssistant, setShowVoiceAssistant] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Sync theme changes with DOM and localStorage
@@ -387,6 +392,12 @@ export default function App() {
     }
   };
 
+  const handleGenerateFreshTimetable = () => {
+    const res = generateInstitutionalTimetable(classes, teachers, rooms, rules, config);
+    setSlots(res.slots);
+    showToast(`تم توليد جدول جديد بنجاح (${res.slots.length} حصة) وفق إعدادات المؤسسة.`);
+  };
+
   // Fix All Conflicts
   const handleAutoFixAll = () => {
     const res = generateInstitutionalTimetable(classes, teachers, rooms, rules, config);
@@ -423,6 +434,7 @@ export default function App() {
         onSelectTab={setActiveTab}
         conflictCount={conflicts.length}
         onOpenDocumentUpdater={() => setShowDocumentUpdater(true)}
+        onOpenVoiceAssistant={() => setShowVoiceAssistant(true)}
       />
 
       {/* Main Workspace Container */}
@@ -450,6 +462,7 @@ export default function App() {
             onDeleteSlot={handleDeleteSlot}
             onClearAllSlots={handleClearAllSlots}
             onSaveVersion={handleSaveVersion}
+            onOpenVoiceAssistant={() => setShowVoiceAssistant(true)}
           />
         )}
 
@@ -470,6 +483,44 @@ export default function App() {
             onRestoreVersion={handleRestoreVersion}
             onDeleteVersion={handleDeleteVersion}
             onNavigateToTimetables={() => setActiveTab('timetables')}
+            onOpenVoiceAssistant={() => setShowVoiceAssistant(true)}
+          />
+        )}
+
+        {activeTab === 'advisor' && (
+          <ScheduleAdvisorView
+            slots={slots}
+            teachers={teachers}
+            classes={classes}
+            rooms={rooms}
+            rules={rules}
+            config={config}
+            onApplyAiDirectives={() => {
+              handleAutoRebalance();
+              showToast('تمت معالجة الفراغات والتعارضات بالذكاء الاصطناعي');
+            }}
+            onNavigateToTimetable={() => setActiveTab('timetables')}
+          />
+        )}
+
+        {activeTab === 'institution' && (
+          <InstitutionSetupView
+            config={config}
+            classes={classes}
+            onSaveConfig={(newCfg) => {
+              setConfig(newCfg);
+              localStorage.setItem('dali_institution_config_2026_v3', JSON.stringify(newCfg));
+              showToast('تم حفظ بيانات المؤسسة ونظام الدوام والملحقة بنجاح');
+            }}
+            onUpdateClasses={(updatedClasses) => {
+              setClasses(updatedClasses);
+              localStorage.setItem('dali_classes_2026_v3', JSON.stringify(updatedClasses));
+              showToast('تم تحديث قائمة الأقسام التربوية بنجاح');
+            }}
+            onGenerateTimetable={() => {
+              handleGenerateFreshTimetable();
+              setActiveTab('timetables');
+            }}
           />
         )}
 
@@ -540,6 +591,27 @@ export default function App() {
           onClose={() => setShowDocumentUpdater(false)}
         />
       )}
+
+      {/* Voice Assistant Modal for School Principal */}
+      <VoiceAssistantModal
+        isOpen={showVoiceAssistant}
+        onClose={() => setShowVoiceAssistant(false)}
+        slots={slots}
+        classes={classes}
+        teachers={teachers}
+        rooms={rooms}
+        rules={rules}
+        config={config}
+        conflicts={conflicts}
+        onApplyUpdatedSlots={(newSlots, message) => {
+          setSlots(newSlots);
+          showToast(message);
+        }}
+        onSaveVersion={handleSaveVersion}
+      />
+
+      {/* Floating Instant Voice Control Trigger */}
+      <VoiceFloatingTrigger onClick={() => setShowVoiceAssistant(true)} />
 
       {/* Footer */}
       <footer className="bg-[#0a0a0a] text-[#888] text-xs py-4 border-t border-[#222] text-center">

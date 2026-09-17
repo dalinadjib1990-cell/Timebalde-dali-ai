@@ -23,6 +23,7 @@ import {
   ArrowRight,
   HelpCircle,
   Filter,
+  Mic,
 } from 'lucide-react';
 import {
   TimetableSlot,
@@ -57,6 +58,7 @@ interface Props {
   onRestoreVersion?: (version: SavedTimetableVersion) => void;
   onDeleteVersion?: (versionId: string) => void;
   onNavigateToTimetables?: () => void;
+  onOpenVoiceAssistant?: () => void;
 }
 
 interface ChatMessage {
@@ -99,6 +101,7 @@ export const AiSchedulerView: React.FC<Props> = ({
   onRestoreVersion,
   onDeleteVersion,
   onNavigateToTimetables,
+  onOpenVoiceAssistant,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState('');
@@ -156,10 +159,50 @@ export const AiSchedulerView: React.FC<Props> = ({
       category: 'pedagogical',
     },
     {
-      id: 'dir-5',
-      key: 'avoid_double_heavy',
-      title: 'تجنب تتابع مادتين ثقيلتين في نفس اليوم',
-      description: 'تفادي وضع حصة رياضيات تليها مباشرة حصة فرنسية أو فيزياء لنفس القسم لتفادي الإرهاق الذهني.',
+      id: 'dir-two-gaps',
+      key: 'avoid_two_hour_gaps',
+      title: 'تجنب ساعتين فراغ في المنتصف للأستاذ',
+      description: 'منع وجود ثغرة ساعتين فراغ بين حصص الأستاذ داخل نفس نصف اليوم إلا لضرورة قصوى.',
+      active: true,
+      category: 'pedagogical',
+    },
+    {
+      id: 'dir-single-gap-relief',
+      key: 'allow_single_gap_on_necessity',
+      title: 'سماح بساعة فراغ واحدة كحد أقصى عند الضرورة القصوى (مع تفضيل 0 فراغ)',
+      description: 'تخفيف الضغط على الخوارزميات بالسماح بساعة فراغ واحدة فقط للأستاذ خلال اليوم عند التعذر، مع منع ساعتين فراغ منعاً باتاً وتفضيل 0 فراغ.',
+      active: true,
+      category: 'pedagogical',
+    },
+    {
+      id: 'dir-single-hour',
+      key: 'avoid_single_hour_shifts',
+      title: 'تجنب حضور الأستاذ لساعة واحدة فقط (صباحاً أو مساءً)',
+      description: 'تفادي برمجة حصة معزولة (ساعة واحدة) للأستاذ في الصباح أو المساء لتفادي إرهاق التنقل غير المجدي.',
+      active: true,
+      category: 'pedagogical',
+    },
+    {
+      id: 'dir-annex-cluster',
+      key: 'cluster_annex_teachers',
+      title: 'تكييف أساتذة الملحقة (2AM) وتقليل تنقلهم',
+      description: 'تجميع حصص أساتذة ملحقة 2AM4, 2AM5, 2AM6 وتفادي التنقل بين المؤسسة والملحقة في نفس نصف اليوم مع حصره في استراحة الظهيرة فقط.',
+      active: true,
+      category: 'ministerial',
+    },
+    {
+      id: 'dir-ped-days',
+      key: 'respect_subject_pedagogical_days',
+      title: 'احترام الأيام البيداغوجية لتنسيق المواد',
+      description: 'تفريغ نصف يوم لكل مادة (مثل الثلاثاء مساءً للفرنسية/العربية، والأربعاء للرياضيات) لاجتماعات التنسيق.',
+      active: true,
+      category: 'ministerial',
+    },
+    {
+      id: 'dir-remedial',
+      key: 'schedule_remedial_slots',
+      title: 'برمجة حصص الاستدراك والدعم (أحمر)',
+      description: 'إدراج حصص الاستدراك البيداغوجي وتلوينها بالأحمر يوم الأربعاء للأساتذة ذوي النصاب الناقص.',
       active: true,
       category: 'pedagogical',
     },
@@ -409,6 +452,53 @@ export const AiSchedulerView: React.FC<Props> = ({
       handleRunGeneration(true);
       instantNote = 'تم بدء توليد خيار جديد وتطبيقه على استعمال الزمن مباشرة.';
     } else if (
+      lower.includes('تخفيف ضغط') ||
+      lower.includes('تخفيف الضغط') ||
+      (lower.includes('ساعة') && lower.includes('فراغ')) ||
+      (lower.includes('ساعه') && lower.includes('فراغ')) ||
+      lower.includes('ساعة واحدة فراغ') ||
+      lower.includes('ساعه واحده فراغ') ||
+      (lower.includes('ضرورة') && lower.includes('فراغ'))
+    ) {
+      const updated = directives.map((d) =>
+        d.key === 'allow_single_gap_on_necessity' || d.key === 'avoid_two_hour_gaps'
+          ? { ...d, active: true }
+          : d
+      );
+      setDirectives(updated);
+      const applied = applyDirectivesInstantlyToExistingTimetable(
+        slots,
+        updated,
+        classes,
+        teachers,
+        rooms,
+        rules,
+        config
+      );
+      onApplyNewTimetable(applied.slots, applied.message);
+      instantNote = 'تم تفعيل التسامح بساعة فراغ واحدة كحد أقصى للأستاذ خلال اليوم عند الضرورة لتخفيف الضغط على الخوارزميات، مع الأفضلية التامة لـ 0 فراغ ومنع ساعتين فراغ تماماً.';
+    } else if (
+      lower.includes('ساعتين') ||
+      lower.includes('ساعتان') ||
+      lower.includes('ساعتين فراغ') ||
+      lower.includes('ساعتان فراغ')
+    ) {
+      const updated = directives.map((d) =>
+        d.key === 'avoid_two_hour_gaps' ? { ...d, active: true } : d
+      );
+      setDirectives(updated);
+      const applied = applyDirectivesInstantlyToExistingTimetable(
+        slots,
+        updated,
+        classes,
+        teachers,
+        rooms,
+        rules,
+        config
+      );
+      onApplyNewTimetable(applied.slots, applied.message);
+      instantNote = 'تم تفعيل حظر ساعتين فراغ في المنتصف للأستاذ وتعديل الحصص تلقائياً.';
+    } else if (
       lower.includes('فارغ') ||
       lower.includes('فاراغ') ||
       lower.includes('فراغ') ||
@@ -449,6 +539,84 @@ export const AiSchedulerView: React.FC<Props> = ({
       );
       onApplyNewTimetable(applied.slots, applied.message);
       instantNote = applied.message;
+    } else if (
+      lower.includes('ملحق') ||
+      lower.includes('ملحقة') ||
+      lower.includes('تنقل') ||
+      lower.includes('مؤسستين') ||
+      lower.includes('2am4') ||
+      lower.includes('2am5') ||
+      lower.includes('2am6')
+    ) {
+      const updated = directives.map((d) =>
+        d.key === 'cluster_annex_teachers' ? { ...d, active: true } : d
+      );
+      setDirectives(updated);
+      const applied = applyDirectivesInstantlyToExistingTimetable(
+        slots,
+        updated,
+        classes,
+        teachers,
+        rooms,
+        rules,
+        config
+      );
+      onApplyNewTimetable(applied.slots, applied.message);
+      instantNote = 'تم تكييف جداول أساتذة الملحقة وتقليص تنقلهم وحصره في فترة الظهيرة/الفراغ فقط.';
+    } else if (
+      lower.includes('ساعة واحدة') ||
+      lower.includes('ساعه واحده') ||
+      lower.includes('حصة واحدة') ||
+      lower.includes('ساعة مساء') ||
+      lower.includes('ساعة صباح')
+    ) {
+      const updated = directives.map((d) =>
+        d.key === 'avoid_single_hour_shifts' ? { ...d, active: true } : d
+      );
+      setDirectives(updated);
+      const applied = applyDirectivesInstantlyToExistingTimetable(
+        slots,
+        updated,
+        classes,
+        teachers,
+        rooms,
+        rules,
+        config
+      );
+      onApplyNewTimetable(applied.slots, applied.message);
+      instantNote = 'تم تجنب برمجة حضور الأستاذ لساعة واحدة فقط وضم الحصص أو تجميعها.';
+    } else if (lower.includes('استدراك') || lower.includes('دعم') || lower.includes('أحمر') || lower.includes('احمر')) {
+      const updated = directives.map((d) =>
+        d.key === 'schedule_remedial_slots' ? { ...d, active: true } : d
+      );
+      setDirectives(updated);
+      const applied = applyDirectivesInstantlyToExistingTimetable(
+        slots,
+        updated,
+        classes,
+        teachers,
+        rooms,
+        rules,
+        config
+      );
+      onApplyNewTimetable(applied.slots, applied.message);
+      instantNote = 'تمت جدولة حصص الاستدراك والدعم البيداغوجي (أحمر) يوم الأربعاء وإكمال نصاب الأساتذة.';
+    } else if (lower.includes('بيداغوجي') || lower.includes('تنسيق المادة')) {
+      const updated = directives.map((d) =>
+        d.key === 'respect_subject_pedagogical_days' ? { ...d, active: true } : d
+      );
+      setDirectives(updated);
+      const applied = applyDirectivesInstantlyToExistingTimetable(
+        slots,
+        updated,
+        classes,
+        teachers,
+        rooms,
+        rules,
+        config
+      );
+      onApplyNewTimetable(applied.slots, applied.message);
+      instantNote = 'تم تفريغ فترات التنسيق البيداغوجي لمدرسي المواد المعنية.';
     } else if (
       lower.includes('فرنسية') ||
       lower.includes('فرنسي') ||
@@ -621,11 +789,15 @@ export const AiSchedulerView: React.FC<Props> = ({
   };
 
   const quickPrompts = [
+    'تخفيف الضغط على الخوارزميات: سماح بساعة فراغ واحدة عند الضرورة (والأفضلية لـ 0 فراغ)',
+    'تكييف أساتذة الملحقة (2AM) وتقليل تنقلهم وحصره في وقت الفراغ',
+    'تجنب ساعتين فراغ في المنتصف للأستاذ قدر الإمكان',
+    'تجنب حضور الأستاذ لساعة واحدة فقط صباحاً أو مساءً',
+    'برمجة حصص الاستدراك والدعم (أحمر) يوم الأربعاء للأساتذة',
     'اريد تقليل الساعات الفارغة البينية للاساتذة',
     'توليد خيار جديد مختلف لجميع الأقسام',
     'فرّغ مساء الثلاثاء لجميع الأساتذة للندوات التربوية',
-    'ركّز حصص الرياضيات واللغة العربية في الفترات الصباحية',
-    'تفريغ جميع الجداول للبدء في الملء اليدوي',
+    'ركّز حصص الرياضيات واللغة العربية والفرنسية صباحاً',
   ];
 
   return (
@@ -1079,6 +1251,18 @@ export const AiSchedulerView: React.FC<Props> = ({
 
           {/* Input Bar */}
           <div className="p-3 bg-[#0a0a0a] border-t border-[#222] flex items-center gap-2">
+            {onOpenVoiceAssistant && (
+              <button
+                type="button"
+                onClick={onOpenVoiceAssistant}
+                className="p-2.5 bg-gradient-to-r from-[#d4af37]/20 to-[#b8972e]/20 hover:from-[#d4af37]/35 hover:to-[#b8972e]/35 text-[#d4af37] border border-[#d4af37]/50 rounded-xl transition-all shadow-sm cursor-pointer flex items-center gap-1.5 shrink-0"
+                title="التحكم الصوتي الفوري: تحدث لنقل حصة أو تعديل الجدول مباشرة"
+              >
+                <Mic className="w-4 h-4 text-red-500 animate-pulse" />
+                <span className="text-xs font-bold hidden sm:inline">🎙️ تحدث</span>
+              </button>
+            )}
+
             <input
               type="text"
               value={chatInput}
