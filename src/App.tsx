@@ -20,6 +20,7 @@ import { DocumentUpdaterModal } from './components/DocumentUpdaterModal';
 import { IslamicTopBar } from './components/IslamicTopBar';
 import { VoiceAssistantModal } from './components/VoiceAssistantModal';
 import { VoiceFloatingTrigger } from './components/VoiceFloatingTrigger';
+import { AiChatBubble } from './components/AiChatBubble';
 import { soundManager } from './services/soundService';
 
 import {
@@ -670,6 +671,20 @@ export default function App() {
 
       {/* Floating Instant Voice Control Trigger */}
       <VoiceFloatingTrigger onClick={() => setShowVoiceAssistant(true)} />
+
+      {/* Floating Text AI Chat Bubble for Interconnected Timetable Control */}
+      <AiChatBubble
+        slots={slots}
+        classes={classes}
+        teachers={teachers}
+        rooms={rooms}
+        rules={rules}
+        config={config}
+        onApplyUpdatedSlots={(newSlots, message) => {
+          setSlots(newSlots);
+          showToast(message);
+        }}
+      />
 
       {/* Footer */}
       <footer className="bg-[#0a0a0a] text-[#888] text-xs py-4 border-t border-[#222] text-center">

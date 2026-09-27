@@ -9,7 +9,7 @@ interface Props {
 
 export const VoiceFloatingTrigger: React.FC<Props> = ({ onClick, isListening = false }) => {
   return (
-    <div className="fixed bottom-6 right-6 z-40 flex items-center gap-2 animate-in slide-in-from-bottom-5">
+    <div className="fixed bottom-6 left-6 z-40 flex items-center gap-2 animate-in slide-in-from-bottom-5">
       <button
         id="voice-assistant-trigger"
         onClick={() => {
