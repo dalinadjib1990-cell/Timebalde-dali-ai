@@ -15,6 +15,7 @@ import { ConflictsView } from './components/ConflictsView';
 import { LegalValidationView } from './components/LegalValidationView';
 import { ScheduleAdvisorView } from './components/ScheduleAdvisorView';
 import { InstitutionSetupView } from './components/InstitutionSetupView';
+import { PrincipalQuickSetupView } from './components/PrincipalQuickSetupView';
 import { DocumentUpdaterModal } from './components/DocumentUpdaterModal';
 import { IslamicTopBar } from './components/IslamicTopBar';
 import { VoiceAssistantModal } from './components/VoiceAssistantModal';
@@ -39,15 +40,16 @@ import {
   DEFAULT_CLASSES,
   DEFAULT_ROOMS,
   DEFAULT_TEACHERS,
+  generateStructuralTeacherPositions,
 } from './data/defaultSchool';
 
-import { generateInstitutionalTimetable, autoRepairTimetable } from './services/scheduler';
+import { generateInstitutionalTimetable, autoRepairTimetable, GenerationDirectives } from './services/scheduler';
 import { detectTimetableConflicts } from './services/conflictDetector';
 import { generateLegalValidationReport } from './services/legalValidator';
 
 export default function App() {
-  // Main State
-  const [activeTab, setActiveTab] = useState<ActiveTab>('official_rules');
+  // Main State - Start directly on Principal Quick Setup View for simple direct manager input
+  const [activeTab, setActiveTab] = useState<ActiveTab>('principal_setup');
   const [rules, setRules] = useState<SubjectRule[]>(() => {
     const saved = localStorage.getItem('dali_subject_rules_2026_v3');
     if (saved) {
@@ -78,18 +80,20 @@ export default function App() {
     return saved ? JSON.parse(saved) : DEFAULT_CLASSES;
   });
 
+  // No fake dummy teacher names! The manager enters their real teachers list
   const [teachers, setTeachers] = useState<Teacher[]>(() => {
     const saved = localStorage.getItem('dali_teachers_2026_v3');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        const frTeachers = parsed.filter((t: Teacher) => t.subjectId === 'french');
-        if (frTeachers.length >= 4) {
+        // If saved list has old fake dummy names, discard and start clean
+        const hasDummy = parsed.some((t: Teacher) => t.name?.includes('بوجمعة') || t.name?.includes('دريسي'));
+        if (!hasDummy && Array.isArray(parsed) && parsed.length > 0) {
           return parsed;
         }
       } catch (e) {}
     }
-    return DEFAULT_TEACHERS;
+    return [];
   });
 
   const [rooms, setRooms] = useState<Room[]>(() => {
@@ -103,18 +107,11 @@ export default function App() {
       try {
         return JSON.parse(saved);
       } catch (e) {
-        // fallback to initial generation
+        // fallback
       }
     }
-    // Generate initial timetable on startup with restored French core curriculum
-    const initialRes = generateInstitutionalTimetable(
-      DEFAULT_CLASSES,
-      DEFAULT_TEACHERS,
-      DEFAULT_ROOMS,
-      OFFICIAL_SUBJECT_RULES,
-      DEFAULT_INSTITUTION_CONFIG
-    );
-    return initialRes.slots;
+    // Default to empty tables for manual filling by the principal as requested
+    return [];
   });
 
   const [savedVersions, setSavedVersions] = useState<SavedTimetableVersion[]>(() => {
@@ -319,7 +316,17 @@ export default function App() {
   // Reset & Clear All Timetables (for pure manual entry)
   const handleClearAllSlots = () => {
     setSlots([]);
-    showToast('تم تفريغ جميع الجداول واستعمالات الزمن بنجاح للملء اليدوي الكامل.');
+    localStorage.setItem('dali_timetable_slots_2026_v3', JSON.stringify([]));
+    showToast('تم تفريغ جميع الجداول واستعمالات الزمن بنجاح للملء اليدوي الكامل للسيد المدير.');
+  };
+
+  // Update Teachers and Config together (e.g. from AI Pedagogical Days assigner)
+  const handleUpdateTeachersAndConfig = (updatedTeachers: Teacher[], updatedConfig: InstitutionConfig) => {
+    setTeachers(updatedTeachers);
+    setConfig(updatedConfig);
+    localStorage.setItem('dali_teachers_2026_v3', JSON.stringify(updatedTeachers));
+    localStorage.setItem('dali_institution_config_2026_v3', JSON.stringify(updatedConfig));
+    showToast('تم اعتماد وتثبيت الأيام البيداغوجية بنجاح لجميع الأساتذة 🧠');
   };
 
   // Save Timetable Version
@@ -392,10 +399,22 @@ export default function App() {
     }
   };
 
-  const handleGenerateFreshTimetable = () => {
-    const res = generateInstitutionalTimetable(classes, teachers, rooms, rules, config);
+  const handleGenerateFreshTimetable = (options: GenerationDirectives = {}) => {
+    let activeTeachers = teachers;
+    if (activeTeachers.length === 0) {
+      activeTeachers = generateStructuralTeacherPositions(classes, rules);
+      setTeachers(activeTeachers);
+      localStorage.setItem('dali_teachers_2026_v3', JSON.stringify(activeTeachers));
+      showToast('تم اعتماد هيكل مناصب المواد آلياً لعدم وجود أساتذة، وتوليد الجدول بنجاح.');
+    }
+    const res = generateInstitutionalTimetable(classes, activeTeachers, rooms, rules, config, [], options);
     setSlots(res.slots);
     showToast(`تم توليد جدول جديد بنجاح (${res.slots.length} حصة) وفق إعدادات المؤسسة.`);
+    confetti({
+      particleCount: 120,
+      spread: 90,
+      origin: { y: 0.6 },
+    });
   };
 
   // Fix All Conflicts
@@ -439,6 +458,41 @@ export default function App() {
 
       {/* Main Workspace Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex-1 w-full space-y-6">
+        {activeTab === 'principal_setup' && (
+          <PrincipalQuickSetupView
+            classes={classes}
+            teachers={teachers}
+            config={config}
+            rules={rules}
+            savedVersions={savedVersions}
+            slots={slots}
+            rooms={rooms}
+            onUpdateClasses={(updatedClasses) => {
+              setClasses(updatedClasses);
+              localStorage.setItem('dali_classes_2026_v3', JSON.stringify(updatedClasses));
+              showToast('تم تحديث قائمة الأقسام بنجاح');
+            }}
+            onUpdateTeachers={(updatedTeachers) => {
+              setTeachers(updatedTeachers);
+              localStorage.setItem('dali_teachers_2026_v3', JSON.stringify(updatedTeachers));
+              showToast('تم تحديث قائمة الأساتذة بنجاح');
+            }}
+            onUpdateConfig={(updatedConfig) => {
+              setConfig(updatedConfig);
+              localStorage.setItem('dali_institution_config_2026_v3', JSON.stringify(updatedConfig));
+              showToast('تم حفظ التوزيع البيداغوجي للمواد بنجاح');
+            }}
+            onGenerateTimetable={(directives) => {
+              handleGenerateFreshTimetable(directives);
+              setActiveTab('timetables');
+            }}
+            onNavigateToTimetables={() => setActiveTab('timetables')}
+            onSaveVersion={handleSaveVersion}
+            onRestoreVersion={handleRestoreVersion}
+            onDeleteVersion={handleDeleteVersion}
+          />
+        )}
+
         {activeTab === 'official_rules' && (
           <OfficialRulesView
             rules={rules}
@@ -461,6 +515,8 @@ export default function App() {
             onAddSlot={handleAddSlot}
             onDeleteSlot={handleDeleteSlot}
             onClearAllSlots={handleClearAllSlots}
+            onGenerateFreshTimetable={handleGenerateFreshTimetable}
+            onUpdateTeachersAndConfig={handleUpdateTeachersAndConfig}
             onSaveVersion={handleSaveVersion}
             onOpenVoiceAssistant={() => setShowVoiceAssistant(true)}
           />
@@ -529,10 +585,12 @@ export default function App() {
             teachers={teachers}
             classes={classes}
             rules={rules}
+            config={config}
             onUpdateTeacher={handleUpdateTeacher}
             onAddTeacher={handleAddTeacher}
             onDeleteTeacher={handleDeleteTeacher}
             onBulkImportTeachers={handleBulkImportTeachers}
+            onUpdateTeachersAndConfig={handleUpdateTeachersAndConfig}
           />
         )}
 

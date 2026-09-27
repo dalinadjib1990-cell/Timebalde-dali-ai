@@ -708,7 +708,7 @@ export async function executeVoiceCommandWithGeminiFallback(
   config: InstitutionConfig,
   onSaveVersion?: (name?: string, notes?: string) => void
 ): Promise<VoiceCommandExecutionResult & { updatedSlots: TimetableSlot[] }> {
-  // First try fast local parser
+  // First try fast local rule-based parser
   const parsed = interpretVoiceCommand(transcript, classes, teachers);
 
   if (parsed.action !== 'UNKNOWN') {
@@ -727,54 +727,78 @@ export async function executeVoiceCommandWithGeminiFallback(
     }
   }
 
-  // If local parser was ambiguous or failed, ask Server Gemini endpoint
+  // If local parser was ambiguous or failed, ask Server Gemini Voice Command endpoint
   try {
-    const sampleSlots = currentSlots.slice(0, 30).map((s) => ({
-      class: classes.find((c) => c.id === s.classId)?.name || s.classId,
-      subject: s.subjectId,
-      teacher: teachers.find((t) => t.id === s.teacherId)?.name || s.teacherId,
-      day: s.day,
-      period: s.period,
-    }));
-
-    const response = await fetch('/api/gemini/ai-scheduler', {
+    const response = await fetch('/api/gemini/voice-command', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        prompt: `الأمر الصوتي المباشر من السيد المدير لتعديل الجدول:\n"${transcript}"`,
-        schoolContext: {
-          totalClasses: classes.length,
-          totalTeachers: teachers.length,
-          days: config.days,
-        },
-        currentTimetableSummary: sampleSlots,
+        speechTranscript: transcript,
+        classes: classes.map((c) => ({ id: c.id, name: c.name, level: c.level })),
+        teachers: teachers.map((t) => ({ id: t.id, name: t.name, subjectId: t.subjectId })),
+        days: config.days,
       }),
     });
 
     if (response.ok) {
       const data = await response.json();
-      const reply = data.replyText || data.message || 'تم استلام وتطبيق توجيه السيد المدير بنجاح.';
 
-      // Check if directives or actions are recommended
+      if (data.action && data.action !== 'UNKNOWN' && data.action !== 'INFO') {
+        const aiParsedCommand: ParsedVoiceCommand = {
+          action: data.action,
+          classId: data.targetClassId,
+          subjectId: data.targetSubjectId,
+          teacherId: data.targetTeacherId,
+          sourceDay: data.sourceDay,
+          sourcePeriod: data.sourcePeriod ? Number(data.sourcePeriod) : undefined,
+          targetDay: data.targetDay,
+          targetPeriod: data.targetPeriod ? Number(data.targetPeriod) : undefined,
+          rawTranscript: transcript,
+          confidence: 0.95,
+        };
+
+        const execRes = await executeVoiceCommand(
+          aiParsedCommand,
+          currentSlots,
+          classes,
+          teachers,
+          rooms,
+          rules,
+          config,
+          onSaveVersion
+        );
+
+        if (execRes.success) {
+          if (data.spokenFeedback) {
+            execRes.spokenFeedback = data.spokenFeedback;
+          }
+          if (data.displayMessage) {
+            execRes.displayMessage = data.displayMessage;
+          }
+          return execRes;
+        }
+      }
+
+      const reply = data.spokenFeedback || data.displayMessage || 'سيدي المدير، تم استلام الأمر الصوتي وجارٍ تنفيذه.';
       return {
         success: true,
         action: 'INFO',
         spokenFeedback: reply,
-        displayMessage: reply,
+        displayMessage: data.displayMessage || reply,
         previousSlots: currentSlots,
         updatedSlots: currentSlots,
       };
     }
   } catch (e) {
-    console.warn('Gemini voice fallback error:', e);
+    // Quiet fallback
   }
 
   // Final fallback
   return {
     success: false,
     action: 'UNKNOWN',
-    spokenFeedback: 'سيدي المدير، لم أتمكن من إتمام الأمر بدقة. يرجى إعادة المحاولة والتأكد من تحديد اسم القسم واليوم.',
-    displayMessage: `لم يتم تنفيذ الأمر: "${transcript}"`,
+    spokenFeedback: 'سيدي المدير، استمعت إلى أمرك. يرجى توضيح اليوم أو الحصة أو القسم بدقة أكثر.',
+    displayMessage: `لم يتم التعرف على تفاصيل الأمر: "${transcript}"`,
     updatedSlots: currentSlots,
   };
 }

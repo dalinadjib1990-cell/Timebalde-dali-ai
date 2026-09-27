@@ -25,6 +25,9 @@ export interface GenerationDirectives {
   compactTeacherDays?: boolean;
   avoidDoubleHeavy?: boolean;
   balanceWeeklySpread?: boolean;
+  annexClassIds?: string[];
+  prioritizeTeacherComfort?: boolean;
+  restrictPeriod7ToRemedial?: boolean; // حظر حصة 15:00-16:00 على الدروس العادية وتخصيصها حصرياً للاستدراك
   directives?: PrincipalDirective[];
 }
 
@@ -77,6 +80,7 @@ export function generateInstitutionalTimetable(
   const tuesdayAfternoonOff = options.tuesdayAfternoonOff ?? (activeDirectives.has('tuesday_afternoon_off') || config.tuesdayAfternoonOff);
   const compactTeacherDays = options.compactTeacherDays ?? activeDirectives.has('compact_teacher_days');
   const avoidDoubleHeavy = options.avoidDoubleHeavy ?? (activeDirectives.has('avoid_double_heavy') || true);
+  const restrictPeriod7ToRemedial = options.restrictPeriod7ToRemedial ?? (activeDirectives.has('restrict_period_7_to_remedial') || true);
 
   // 1. Build teacher lookup index
   const teacherSubjectMap = new Map<SubjectId, Teacher[]>();
@@ -214,6 +218,24 @@ export function generateInstitutionalTimetable(
           isSplitGroup: isTd,
         });
       }
+
+      // Remedial Session (ساعة استدراك ودعم تربوي للمواد الأساسية)
+      if (
+        scheduleRemedialSlots &&
+        ['arabic', 'math', 'french', 'english', 'science', 'physics'].includes(rule.subject_id)
+      ) {
+        requirements.push({
+          id: `req-${cls.id}-${rule.subject_id}-remedial`,
+          classId: cls.id,
+          level: cls.level,
+          subjectId: rule.subject_id,
+          teacherId,
+          duration: 1,
+          type: 'remedial',
+          preferredRoomType: 'regular',
+          isSplitGroup: false,
+        });
+      }
     }
   }
 
@@ -342,6 +364,7 @@ export function generateInstitutionalTimetable(
   // Helper to check if a class belongs to the Annex institution
   const classMap = new Map(classes.map((c) => [c.id, c]));
   const isClassAnnex = (cId: string): boolean => {
+    if (options.annexClassIds && options.annexClassIds.includes(cId)) return true;
     const c = classMap.get(cId);
     if (!c) return false;
     return !!c.isAnnex || (!!c.name && c.name.includes('ملحقة')) || (!!config.hasAnnex && ['2am4', '2am5', '2am6'].includes(c.id));
@@ -378,7 +401,7 @@ export function generateInstitutionalTimetable(
   }
 
   function getSlotOptions(req: LessonRequirement): SlotOption[] {
-    const options: SlotOption[] = [];
+    const candidates: SlotOption[] = [];
 
     for (const day of rotatedDays) {
       // 8 periods per day
@@ -396,6 +419,30 @@ export function generateInstitutionalTimetable(
           if (tuesdayAfternoonOff && day === 'الثلاثاء' && p + 1 >= 5) continue;
         }
 
+        // Score heuristic:
+        let score = 100;
+
+        // DIRECTIVE: حظر الحصة 7 (15:00 - 16:00) وما بعدها على الدروس العادية وتخصيصها حصرياً للاستدراك
+        // Crucial pedagogical constraint: Normal lessons must finish by 15:00 (periods 1-6 only).
+        // Period 7 (15:00 - 16:00) is strictly reserved for remedial sessions (استدراك) and never regular classes.
+        const isRemedial = req.type === 'remedial';
+        if (!isRemedial) {
+          if (p >= 7) {
+            if (restrictPeriod7ToRemedial) {
+              continue; // Strictly forbidden for regular lessons
+            } else {
+              score -= 3500;
+            }
+          }
+          if (req.duration === 2 && p === 6) {
+            if (restrictPeriod7ToRemedial) {
+              continue; // Cannot span into 15:00-16:00
+            } else {
+              score -= 3500;
+            }
+          }
+        }
+
         // DIRECTIVE: Respect Subject Pedagogical Coordination Days (اليوم البيداغوجي لكل مادة)
         if (respectSubjectPedagogicalDays && config.subjectPedagogicalDays) {
           const pedDay = config.subjectPedagogicalDays[req.subjectId];
@@ -405,9 +452,6 @@ export function generateInstitutionalTimetable(
             if (pedDay.periodRange === 'afternoon' && p >= 5) continue;
           }
         }
-
-        // Score heuristic:
-        let score = 100;
 
         // DIRECTIVE: Morning priority for hard cognitive subjects (French restored as primary cognitive core)
         const isMorning = p <= 4;
@@ -430,12 +474,15 @@ export function generateInstitutionalTimetable(
           score += !isMorning ? 30 : 5;
         }
 
-        // Remedial slots preferred on designated remedial day & period
+        // Remedial slots preferred on designated remedial day & period 7 (15:00 - 16:00)
         if (req.type === 'remedial') {
+          if (p === 7) {
+            score += 260; // 15:00 - 16:00 is the prime designated remedial slot
+          }
           if (config.remedialDay && day === config.remedialDay) {
-            score += 85;
+            score += 150;
             if (config.remedialPeriod && p === config.remedialPeriod) {
-              score += 90;
+              score += 200;
             }
           }
         }
@@ -454,16 +501,21 @@ export function generateInstitutionalTimetable(
             for (const s of halfDaySlots) {
               const slotIsAnnex = isClassAnnex(s.classId);
               if (reqIsAnnex !== slotIsAnnex) {
-                score -= 800; // Strictly forbidden: teacher must not travel back and forth within a single half-day
+                score -= options.prioritizeTeacherComfort ? 1500 : 800; // Strictly forbidden: teacher must not travel back and forth within a single half-day
                 break;
               }
             }
 
             // High bonus for clustering lessons of the same institution together
             if (halfDaySlots.some((s) => isClassAnnex(s.classId) === reqIsAnnex)) {
-              score += 55;
+              score += options.prioritizeTeacherComfort ? 120 : 55;
             }
           }
+        }
+
+        // Avoid overloading teacher with more than 4 hours in a single day when comfort is prioritized
+        if (options.prioritizeTeacherComfort && currentTeacherPeriods.length >= 4) {
+          score -= 300;
         }
 
         // DIRECTIVE: Minimize Teacher Gaps & Avoid 2-hour gaps in middle
@@ -568,13 +620,13 @@ export function generateInstitutionalTimetable(
         const slotJitter = (pseudoRand(p * 17 + day.charCodeAt(0) * 31 + req.id.length) - 0.5) * 18;
         score += slotJitter;
 
-        options.push({ day, period: p, score });
+        candidates.push({ day, period: p, score });
       }
     }
 
     // Sort by descending pedagogical score
-    options.sort((a, b) => b.score - a.score);
-    return options;
+    candidates.sort((a, b) => b.score - a.score);
+    return candidates;
   }
 
   // 7. CSP Greedy-Backtracking Placement
@@ -582,10 +634,10 @@ export function generateInstitutionalTimetable(
 
   for (const req of requirements) {
     const cls = classMap.get(req.classId);
-    const options = getSlotOptions(req);
+    const slotOptions = getSlotOptions(req);
     let placed = false;
 
-    for (const opt of options) {
+    for (const opt of slotOptions) {
       const { day, period } = opt;
       const p2 = period + 1;
 

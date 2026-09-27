@@ -17,6 +17,7 @@ import {
 import { soundManager } from '../services/soundService';
 
 export type ActiveTab =
+  | 'principal_setup'
   | 'official_rules'
   | 'timetables'
   | 'ai_scheduler'
@@ -45,6 +46,13 @@ export const Navbar: React.FC<Props> = ({
   onOpenVoiceAssistant,
 }) => {
   const tabs = [
+    {
+      id: 'principal_setup' as ActiveTab,
+      name: 'مدخلات المدير السهلة والتوليد',
+      icon: Sparkles,
+      badge: 'إعداد وتوليد فوري',
+      highlight: true,
+    },
     {
       id: 'official_rules' as ActiveTab,
       name: 'المواقيت والمعاملات الرسمية',

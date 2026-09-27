@@ -16,29 +16,34 @@ import {
   Save,
   FileSpreadsheet,
 } from 'lucide-react';
-import { Teacher, SchoolClass, SubjectRule, SubjectId } from '../types';
+import { Teacher, SchoolClass, SubjectRule, SubjectId, InstitutionConfig } from '../types';
 import { SUBJECT_METADATA } from '../data/officialData';
 import { calculateAllTeachersWorkloads } from '../services/workloadCalculator';
 import { SubjectIcon } from './SubjectIcon';
+import { PedagogicalDaysModal } from './PedagogicalDaysModal';
 
 interface Props {
   teachers: Teacher[];
   classes: SchoolClass[];
   rules: SubjectRule[];
+  config?: InstitutionConfig;
   onUpdateTeacher: (teacher: Teacher) => void;
   onAddTeacher: (teacher: Teacher) => void;
   onDeleteTeacher: (teacherId: string) => void;
   onBulkImportTeachers: (newTeachers: Teacher[]) => void;
+  onUpdateTeachersAndConfig?: (teachers: Teacher[], config: InstitutionConfig) => void;
 }
 
 export const TeachersManagementView: React.FC<Props> = ({
   teachers,
   classes,
   rules,
+  config,
   onUpdateTeacher,
   onAddTeacher,
   onDeleteTeacher,
   onBulkImportTeachers,
+  onUpdateTeachersAndConfig,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('all');
@@ -46,6 +51,7 @@ export const TeachersManagementView: React.FC<Props> = ({
   const [editingTeacher, setEditingTeacher] = useState<Teacher | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAiImportModal, setShowAiImportModal] = useState(false);
+  const [showPedagogicalModal, setShowPedagogicalModal] = useState(false);
 
   // AI Import State
   const [rawRosterText, setRawRosterText] = useState('');
@@ -60,6 +66,8 @@ export const TeachersManagementView: React.FC<Props> = ({
   const [formPhone, setFormPhone] = useState('');
   const [formNotes, setFormNotes] = useState('');
   const [formAssignedClasses, setFormAssignedClasses] = useState<string[]>([]);
+  const [formPedagogicalDay, setFormPedagogicalDay] = useState('الثلاثاء');
+  const [formPedagogicalRange, setFormPedagogicalRange] = useState<'morning' | 'afternoon' | 'all_day'>('morning');
 
   // Calculate workloads
   const workloadReports = calculateAllTeachersWorkloads(teachers, classes, rules);
@@ -82,6 +90,8 @@ export const TeachersManagementView: React.FC<Props> = ({
     setFormPhone('');
     setFormNotes('');
     setFormAssignedClasses([]);
+    setFormPedagogicalDay('الثلاثاء');
+    setFormPedagogicalRange('morning');
     setEditingTeacher(null);
     setShowAddModal(true);
   };
@@ -95,12 +105,27 @@ export const TeachersManagementView: React.FC<Props> = ({
     setFormPhone(t.phone || '');
     setFormNotes(t.notes || '');
     setFormAssignedClasses([...t.assignedClassIds]);
+    setFormPedagogicalDay(t.pedagogicalDay || config?.subjectPedagogicalDays?.[t.subjectId]?.day || 'الثلاثاء');
+    setFormPedagogicalRange(t.pedagogicalPeriodRange || config?.subjectPedagogicalDays?.[t.subjectId]?.periodRange || 'morning');
     setShowAddModal(true);
   };
 
   const handleSaveForm = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formName.trim()) return;
+
+    let pedPeriods = [1, 2, 3, 4];
+    if (formPedagogicalRange === 'all_day') {
+      pedPeriods = [1, 2, 3, 4, 5, 6, 7, 8];
+    } else if (formPedagogicalRange === 'afternoon') {
+      pedPeriods = [5, 6, 7, 8];
+    }
+
+    const pedSlots = pedPeriods.map((p) => ({
+      day: formPedagogicalDay,
+      period: p,
+      reason: `اليوم البيداغوجي لمادة ${SUBJECT_METADATA[formSubject]?.name || formSubject}`,
+    }));
 
     if (editingTeacher) {
       const updated: Teacher = {
@@ -112,6 +137,12 @@ export const TeachersManagementView: React.FC<Props> = ({
         phone: formPhone,
         notes: formNotes,
         assignedClassIds: formAssignedClasses,
+        pedagogicalDay: formPedagogicalDay,
+        pedagogicalPeriodRange: formPedagogicalRange,
+        unavailableSlots: [
+          ...editingTeacher.unavailableSlots.filter((u) => !u.reason?.includes('بيداغوجي')),
+          ...pedSlots,
+        ],
       };
       onUpdateTeacher(updated);
     } else {
@@ -124,7 +155,9 @@ export const TeachersManagementView: React.FC<Props> = ({
         phone: formPhone,
         notes: formNotes,
         assignedClassIds: formAssignedClasses,
-        unavailableSlots: [],
+        pedagogicalDay: formPedagogicalDay,
+        pedagogicalPeriodRange: formPedagogicalRange,
+        unavailableSlots: pedSlots,
       };
       onAddTeacher(created);
     }
@@ -208,7 +241,16 @@ export const TeachersManagementView: React.FC<Props> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            id="ai-pedagogical-days-btn"
+            onClick={() => setShowPedagogicalModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#1c142b] hover:bg-[#281c3d] text-[#c084fc] border border-[#c084fc]/50 text-xs font-bold rounded-xl shadow-lg transition-all active:scale-95 cursor-pointer"
+            title="تحديد وتوزيع الأيام البيداغوجية لهيئة التدريس بالذكاء الاصطناعي"
+          >
+            <Sparkles className="w-4 h-4 text-[#c084fc]" />
+            <span>الأيام البيداغوجية (AI)</span>
+          </button>
           <button
             id="ai-import-teachers-btn"
             onClick={() => setShowAiImportModal(true)}
@@ -284,6 +326,7 @@ export const TeachersManagementView: React.FC<Props> = ({
                 <th className="p-3.5">الأفواج والأقسام المسندة</th>
                 <th className="p-3.5 text-center">النصاب المحسوب</th>
                 <th className="p-3.5 text-center">حالة النصاب</th>
+                <th className="p-3.5 text-center">اليوم البيداغوجي (AI)</th>
                 <th className="p-3.5 text-center">قيود عدم التوفر</th>
                 <th className="p-3.5 text-center">الإجراءات</th>
               </tr>
@@ -370,6 +413,36 @@ export const TeachersManagementView: React.FC<Props> = ({
                           <span>ساعات شاغرة ({workload?.difference} سا)</span>
                         </span>
                       )}
+                    </td>
+
+                    <td className="p-3.5 text-center">
+                      {(() => {
+                        const pedDay = teacher.pedagogicalDay || config.subjectPedagogicalDays?.[teacher.subjectId]?.day;
+                        const pedRange = teacher.pedagogicalPeriodRange || config.subjectPedagogicalDays?.[teacher.subjectId]?.periodRange || 'morning';
+                        return pedDay ? (
+                          <div className="inline-flex flex-col items-center">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg font-bold text-[11px] ${
+                              pedRange === 'all_day'
+                                ? 'bg-purple-950/80 text-purple-200 border border-purple-400'
+                                : 'bg-[#1c142b] text-[#c084fc] border border-[#c084fc]/30'
+                            }`}>
+                              <span>🎓</span>
+                              <span>{pedDay}</span>
+                              <span className="text-[9px] text-[#aaa]">
+                                ({pedRange === 'all_day' ? 'يوم كامل فارغ كلياً' : pedRange === 'morning' ? 'صباحاً' : 'مساءً'})
+                              </span>
+                            </span>
+                            <span className="text-[9px] text-[#666] mt-0.5">معتمد بالذكاء الاصطناعي</span>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setShowPedagogicalModal(true)}
+                            className="text-[10px] text-[#888] hover:text-[#c084fc] underline cursor-pointer"
+                          >
+                            تحديد بالـ AI
+                          </button>
+                        );
+                      })()}
                     </td>
 
                     <td className="p-3.5 text-center">
@@ -607,6 +680,42 @@ export const TeachersManagementView: React.FC<Props> = ({
                       </button>
                     );
                   })}
+                </div>
+              </div>
+
+              {/* Pedagogical Day Selection */}
+              <div className="grid grid-cols-2 gap-3 p-3 bg-[#121212] border border-[#222] rounded-xl">
+                <div>
+                  <label className="block text-xs font-semibold text-[#c084fc] mb-1 flex items-center gap-1">
+                    <span>🎓</span>
+                    <span>اليوم البيداغوجي (ندوة المادة)</span>
+                  </label>
+                  <select
+                    value={formPedagogicalDay}
+                    onChange={(e) => setFormPedagogicalDay(e.target.value)}
+                    className="w-full p-2 bg-[#181818] border border-[#333] text-white rounded-lg text-xs focus:border-[#c084fc] outline-hidden font-bold"
+                  >
+                    {days.map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-[#c084fc] mb-1">
+                    فترة التنسيق البيداغوجي
+                  </label>
+                  <select
+                    value={formPedagogicalRange}
+                    onChange={(e) => setFormPedagogicalRange(e.target.value as 'morning' | 'afternoon' | 'all_day')}
+                    className="w-full p-2 bg-[#181818] border border-[#333] text-white rounded-lg text-xs focus:border-[#c084fc] outline-hidden font-bold"
+                  >
+                    <option value="all_day">🌟 يوم كامل فارغ كلياً (الحصص 1 - 8)</option>
+                    <option value="morning">الفترة الصباحية (الحصص 1 - 4)</option>
+                    <option value="afternoon">الفترة المسائية (الحصص 5 - 8)</option>
+                  </select>
                 </div>
               </div>
 

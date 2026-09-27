@@ -115,6 +115,8 @@ export interface Teacher {
   notes?: string;
   isMultiSchool?: boolean; // أستاذ منتدب أو يدرس بين مؤسستين
   teachesInAnnex?: boolean; // يدرس في ملحقة
+  pedagogicalDay?: string; // اليوم البيداغوجي (المحدد بالذكاء الاصطناعي)
+  pedagogicalPeriodRange?: 'morning' | 'afternoon' | 'all_day'; // نصف اليوم البيداغوجي
 }
 
 export interface Room {
